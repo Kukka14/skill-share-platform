@@ -16,9 +16,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
-    //notification object 
+    
+    //notification object   --->>added by nethmi
     private final NotificationService notificationService;
-
+    
     public AuthService(UserRepository userRepository, JwtUtil jwtUtil,NotificationService notificationService) {//added by nethmi
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
