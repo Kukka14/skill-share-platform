@@ -56,5 +56,10 @@ public class NotificationService {
     }
     
 
+    public void deleteMultipleNotifications(List<String> notificationIds) {
+        notificationRepository.deleteAllById(notificationIds);
+    }
+    
+
     
 }

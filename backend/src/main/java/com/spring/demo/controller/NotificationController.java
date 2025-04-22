@@ -42,4 +42,15 @@ public class NotificationController {
 }
 
 
+@DeleteMapping("/bulk-delete")
+public ResponseEntity<String> deleteMultipleNotifications(@RequestBody List<String> notificationIds) {
+    try {
+        notificationService.deleteMultipleNotifications(notificationIds);
+        return ResponseEntity.ok("Notifications deleted successfully.");
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body("Failed to delete notifications.");
+    }
+}
+
+
 }
