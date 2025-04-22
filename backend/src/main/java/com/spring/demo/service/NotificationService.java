@@ -28,7 +28,7 @@ public class NotificationService {
         notification.setUserId(userId);
         notification.setUsername(username);
         notification.setDescription(username + " has successfully signed up.");
-        notification.setIsRead(false);
+        notification.setRead(false);
         notification.setTimestamp(LocalDateTime.now());
 
         notificationRepository.save(notification);
@@ -43,7 +43,7 @@ public class NotificationService {
         Notification notification = notificationRepository.findById(notificationId)
             .orElseThrow(() -> new RuntimeException("Notification not found"));
     
-        notification.setIsRead(true);
+        notification.setRead(true);
         notificationRepository.save(notification);
     }
     
