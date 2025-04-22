@@ -46,5 +46,15 @@ public class NotificationService {
         notification.setRead(true);
         notificationRepository.save(notification);
     }
+   
+
+    public void deleteNotification(String notificationId) {
+        if (!notificationRepository.existsById(notificationId)) {
+            throw new RuntimeException("Notification not found");
+        }
+        notificationRepository.deleteById(notificationId);
+    }
+    
+
     
 }

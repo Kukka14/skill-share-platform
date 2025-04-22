@@ -30,4 +30,16 @@ public class NotificationController {
         notificationService.markAsRead(notificationId);
         return ResponseEntity.ok("Notification marked as read successfully.");
     }
+
+    @DeleteMapping("/{notificationId}")
+    public ResponseEntity<String> deleteNotification(@PathVariable String notificationId) {
+    try {
+        notificationService.deleteNotification(notificationId);
+        return ResponseEntity.ok("Notification deleted successfully.");
+    } catch (RuntimeException e) {
+        return ResponseEntity.status(404).body(e.getMessage());
+    }
+}
+
+
 }
