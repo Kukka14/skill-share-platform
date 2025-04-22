@@ -8,6 +8,7 @@ import com.spring.demo.model.User;
 import com.spring.demo.repository.UserRepository;
 import com.spring.demo.util.JwtUtil;
 import org.springframework.stereotype.Service;
+import com.spring.demo.service.NotificationService;
 
 @Service
 public class AuthService {
@@ -15,9 +16,13 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
-    public AuthService(UserRepository userRepository, JwtUtil jwtUtil) {
+    //notification object 
+    private final NotificationService notificationService;
+
+    public AuthService(UserRepository userRepository, JwtUtil jwtUtil,NotificationService notificationService) {//added by nethmi
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
+        this.notificationService = notificationService;// added by nethmi
     }
 
     public User signup(SignupRequest request) {
@@ -38,7 +43,15 @@ public class AuthService {
         user.setBio("");
         user.setProfileImageUrl("");
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);  //added by nethmi
+
+        notificationService.createSignupNotification(savedUser.getId(), savedUser.getUsername()); // added by nethmi
+
+        System.out.println("Saved user ID: " + savedUser.getId());
+        System.out.println("Creating notification...");
+
+
+        return savedUser; // added by nethmi
     }
 
     public JwtResponse login(LoginRequest request) {
