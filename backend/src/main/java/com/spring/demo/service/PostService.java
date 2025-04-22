@@ -111,6 +111,93 @@ public class PostService {
 
     }
 
+    public List<Post> getAllPosts() {
+        return postRepository.findAll();
+    }
+
+    public Post getPostById(String id) {
+        return postRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Post not found with id: " + id));
+    }
+
+    public List<Post> getPostsByUserId(String userId) {
+        return postRepository.findByUserId(userId);
+    }
+
+    public Post updatePost(String id, String description, List<MultipartFile> mediaFiles) throws IOException {
+        Post existingPost = getPostById(id);
+
+        if (description != null && !description.isEmpty()) {
+            existingPost.setDescription(description);
+        }
+
+        if (mediaFiles != null && !mediaFiles.isEmpty()) {
+            if (mediaFiles.size() > 3) {
+                throw new IllegalArgumentException("Maximum 3 media files allowed per post");
+            }
+
+            // Delete old files
+            deleteOldFiles(existingPost.getMediaUrls());
+
+            List<String> mediaUrls = new ArrayList<>();
+            List<String> mediaTypes = new ArrayList<>();
+
+            Path uploadDir = Paths.get(uploadPath);
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+
+            for (MultipartFile file : mediaFiles) {
+                String contentType = file.getContentType();
+                if (!isValidMediaType(contentType)) {
+                    throw new IllegalArgumentException("Invalid media type. Only images and videos are allowed");
+                }
+
+                if (contentType.startsWith("video/") && file.getSize() > 30 * 1024 * 1024) {
+                    throw new IllegalArgumentException("Video file size exceeds 30MB limit");
+                }
+
+                String originalFilename = file.getOriginalFilename();
+                String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+                String uniqueFilename = UUID.randomUUID().toString() + extension;
+
+                Path filePath = uploadDir.resolve(uniqueFilename);
+                Files.copy(file.getInputStream(), filePath);
+
+                mediaUrls.add("/uploads/" + uniqueFilename);
+                mediaTypes.add(contentType);
+            }
+
+            existingPost.setMediaUrls(mediaUrls);
+            existingPost.setMediaTypes(mediaTypes);
+        }
+
+        return postRepository.save(existingPost);
+    }
+
+    public void deletePost(String id) throws IOException {
+        Post post = getPostById(id);
+        
+        // Delete associated files
+        deleteOldFiles(post.getMediaUrls());
+        
+        // Delete post from database
+        postRepository.delete(post);
+    }
+
+    private void deleteOldFiles(List<String> mediaUrls) {
+        for (String url : mediaUrls) {
+            try {
+                String filename = url.substring(url.lastIndexOf("/") + 1);
+                Path filePath = Paths.get(uploadPath, filename);
+                Files.deleteIfExists(filePath);
+            } catch (IOException e) {
+                // Log the error but continue with other files
+                System.err.println("Error deleting file: " + e.getMessage());
+            }
+        }
+    }
+
     private boolean isValidMediaType(String contentType) {
         return contentType != null && 
                (contentType.startsWith("image/") || contentType.startsWith("video/"));
