@@ -2,32 +2,72 @@ package com.spring.demo.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DBRef;
-import lombok.Data;
-
-import java.time.LocalDateTime;
 
 @Document(collection = "comments")
-@Data
 public class Comment {
     @Id
     private String id;
-
-    @DBRef
+    private String userId;
+    private String postId;
+    private String content;
+    private long createdAt;
+    private long updatedAt;
     private User user;
 
-    private String postId;  // Reference to post until Post entity is implemented
+    // Getters and Setters
+    public String getId() {
+        return id;
+    }
 
-    private String content;  // The actual comment text
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    private LocalDateTime createdAt;
+    public String getUserId() {
+        return userId;
+    }
 
-    private LocalDateTime updatedAt;
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
 
-    // Constructor to initialize timestamps
-    public Comment() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
+    public String getPostId() {
+        return postId;
+    }
+
+    public void setPostId(String postId) {
+        this.postId = postId;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public long getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(long updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public User getUser() {
+        return user;
+    }
+    
+    public void setUser(User user) {
+        this.user = user;
     }
 }

@@ -1,6 +1,5 @@
 package com.spring.demo.controller;
 
-import com.spring.demo.model.User;
 import com.spring.demo.model.Like;
 import com.spring.demo.model.Comment;
 import com.spring.demo.service.LikeService;
@@ -26,17 +25,25 @@ public class InteractionController {
     @PostMapping("/posts/{postId}/like")
     public ResponseEntity<?> likePost(
             @PathVariable String postId,
-            @AuthenticationPrincipal User user) {
-        Like like = likeService.createLike(user.getId(), postId);
-        return ResponseEntity.ok(like);
+            @RequestParam String userId) {
+        try {
+            Like like = likeService.createLike(userId, postId);
+            return ResponseEntity.ok(like);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @DeleteMapping("/posts/{postId}/like")
     public ResponseEntity<?> unlikePost(
             @PathVariable String postId,
-            @AuthenticationPrincipal User user) {
-        likeService.removeLike(user.getId(), postId);
-        return ResponseEntity.ok().build();
+            @RequestParam String userId) {
+        try {
+            likeService.removeLike(userId, postId);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/posts/{postId}/likes")
@@ -51,26 +58,38 @@ public class InteractionController {
 
     // Comment endpoints
     @PostMapping("/posts/{postId}/comments")
-    public ResponseEntity<Comment> createComment(
+    public ResponseEntity<?> createComment(
             @PathVariable String postId,
-            @AuthenticationPrincipal User user,
+            @RequestParam String userId,
             @RequestBody String content) {
-        Comment comment = commentService.createComment(user.getId(), postId, content);
-        return ResponseEntity.ok(comment);
+        try {
+            Comment comment = commentService.createComment(userId, postId, content);
+            return ResponseEntity.ok(comment);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PutMapping("/comments/{commentId}")
-    public ResponseEntity<Comment> updateComment(
+    public ResponseEntity<?> updateComment(
             @PathVariable String commentId,
             @RequestBody String content) {
-        Comment updated = commentService.updateComment(commentId, content);
-        return ResponseEntity.ok(updated);
+        try {
+            Comment updated = commentService.updateComment(commentId, content);
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @DeleteMapping("/comments/{commentId}")
     public ResponseEntity<?> deleteComment(@PathVariable String commentId) {
-        commentService.deleteComment(commentId);
-        return ResponseEntity.ok().build();
+        try {
+            commentService.deleteComment(commentId);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping("/posts/{postId}/comments")
@@ -80,12 +99,7 @@ public class InteractionController {
 
     @GetMapping("/users/{userId}/comments")
     public ResponseEntity<List<Comment>> getUserComments(@PathVariable String userId) {
-        return ResponseEntity.ok(commentService.getCommentsByUser(userId));
-    }
-
-    @GetMapping("/comments/search")
-    public ResponseEntity<List<Comment>> searchComments(@RequestParam String keyword) {
-        return ResponseEntity.ok(commentService.searchComments(keyword));
+        return ResponseEntity.ok(commentService.getCommentsByUserId(userId));
     }
 
     @GetMapping("/posts/{postId}/comments/count")

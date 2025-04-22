@@ -22,30 +22,45 @@ public class CommentService {
 
     // Create a new comment
     public Comment createComment(String userId, String postId, String content) {
+        // Input validation
+        if (content == null || content.trim().isEmpty()) {
+            throw new IllegalArgumentException("Comment content cannot be empty");
+        }
+
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
 
         Comment comment = new Comment();
         comment.setUser(user);
         comment.setPostId(postId);
-        comment.setContent(content);
+        comment.setContent(content.trim());
+        comment.setCreatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+        comment.setUpdatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
         
         return commentRepository.save(comment);
     }
 
     // Update an existing comment
     public Comment updateComment(String commentId, String content) {
+        // Input validation
+        if (content == null || content.trim().isEmpty()) {
+            throw new IllegalArgumentException("Comment content cannot be empty");
+        }
+
         Comment comment = commentRepository.findById(commentId)
             .orElseThrow(() -> new RuntimeException("Comment not found"));
         
-        comment.setContent(content);
-        comment.setUpdatedAt(LocalDateTime.now());
+        comment.setContent(content.trim());
+        comment.setUpdatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
         
         return commentRepository.save(comment);
     }
 
     // Delete a comment
     public void deleteComment(String commentId) {
+        if (!commentRepository.existsById(commentId)) {
+            throw new IllegalArgumentException("Comment not found");
+        }
         commentRepository.deleteById(commentId);
     }
 
@@ -54,8 +69,8 @@ public class CommentService {
         return commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
     }
 
-    // Get all comments by a user
-    public List<Comment> getCommentsByUser(String userId) {
+    // Change method name from getCommentsByUser to getCommentsByUserId
+    public List<Comment> getCommentsByUserId(String userId) {
         return commentRepository.findByUserId(userId);
     }
 
