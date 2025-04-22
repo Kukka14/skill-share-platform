@@ -21,6 +21,8 @@ public class Notification {
     private LocalDateTime timestamp;
 
 
+
+
     // Getters
     // public String getNotificationId() {
     //     return notificationId;
