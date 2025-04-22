@@ -21,10 +21,4 @@ public interface LikeRepository extends MongoRepository<Like, String> {
     
     // Count likes for a specific post
     long countByPostId(String postId);
-    
-    // Delete like by user and post
-    void deleteByUserIdAndPostId(String userId, String postId);
-    
-    // Check if a user has liked a post
-    boolean existsByUserIdAndPostId(String userId, String postId);
 }

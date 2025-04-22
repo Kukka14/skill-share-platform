@@ -21,27 +21,28 @@ public class LikeService {
 
     // Create a new like
     public Like createLike(String userId, String postId) {
-        // Check if user has already liked the post
+        // Check if like already exists
         Optional<Like> existingLike = likeRepository.findByUserIdAndPostId(userId, postId);
         if (existingLike.isPresent()) {
-            throw new RuntimeException("User has already liked this post");
+            throw new IllegalArgumentException("User has already liked this post");
         }
 
-        // Find the user
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Create and save the new like
+        // Create new like
         Like like = new Like();
-        like.setUser(user);
+        like.setUserId(userId);
         like.setPostId(postId);
-        
+
         return likeRepository.save(like);
     }
 
     // Remove a like
     public void removeLike(String userId, String postId) {
-        likeRepository.deleteByUserIdAndPostId(userId, postId);
+        Optional<Like> like = likeRepository.findByUserIdAndPostId(userId, postId);
+        if (like.isPresent()) {
+            likeRepository.delete(like.get());
+        } else {
+            throw new IllegalArgumentException("Like not found");
+        }
     }
 
     // Get all likes for a post
@@ -56,7 +57,7 @@ public class LikeService {
 
     // Check if user has liked a post
     public boolean hasUserLikedPost(String userId, String postId) {
-        return likeRepository.existsByUserIdAndPostId(userId, postId);
+        return likeRepository.findByUserIdAndPostId(userId, postId).isPresent();
     }
 
     // Get all likes by a user
