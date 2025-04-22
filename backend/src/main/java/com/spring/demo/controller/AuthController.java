@@ -7,6 +7,7 @@ import com.spring.demo.model.User;
 import com.spring.demo.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+//added by nethmi
 
 @RestController
 @RequestMapping("/api/auth")
