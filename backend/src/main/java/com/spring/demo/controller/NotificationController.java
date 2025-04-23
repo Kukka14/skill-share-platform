@@ -30,4 +30,27 @@ public class NotificationController {
         notificationService.markAsRead(notificationId);
         return ResponseEntity.ok("Notification marked as read successfully.");
     }
+
+    @DeleteMapping("/{notificationId}")
+    public ResponseEntity<String> deleteNotification(@PathVariable String notificationId) {
+    try {
+        notificationService.deleteNotification(notificationId);
+        return ResponseEntity.ok("Notification deleted successfully.");
+    } catch (RuntimeException e) {
+        return ResponseEntity.status(404).body(e.getMessage());
+    }
+}
+
+
+@DeleteMapping("/bulk-delete")
+public ResponseEntity<String> deleteMultipleNotifications(@RequestBody List<String> notificationIds) {
+    try {
+        notificationService.deleteMultipleNotifications(notificationIds);
+        return ResponseEntity.ok("Notifications deleted successfully.");
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body("Failed to delete notifications.");
+    }
+}
+
+
 }
