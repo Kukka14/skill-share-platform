@@ -24,7 +24,5 @@ public class User {
     private String profileImageUrl;  // Stores path like "/profile-images/user123.jpg"
     
     // Getters and setters (omitted for brevity, use Lombok @Data)
-
-}
 }
 
