@@ -6,6 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.spring.demo.model.Notification; //added by nethmi 
+import com.spring.demo.model.User;
+import com.spring.demo.repository.NotificationRepository;
+import com.spring.demo.repository.UserRepository;
+import java.time.LocalDateTime;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -19,6 +25,13 @@ import java.util.UUID;
 @Service
 public class PostService {
 
+    @Autowired    //added by nethmi
+    private UserRepository userRepository;
+
+    @Autowired   // added by nethmi 
+    private NotificationRepository notificationRepository;
+
+
     @Value("${upload.path}")
     private String uploadPath;
 
@@ -26,6 +39,8 @@ public class PostService {
     private PostRepository postRepository;
 
     public Post createPost(String userId, String description, List<MultipartFile> mediaFiles) throws IOException {
+        
+        
         if (mediaFiles.size() > 3) {
             throw new IllegalArgumentException("Maximum 3 media files allowed per post");
         }
@@ -72,7 +87,28 @@ public class PostService {
         post.setMediaUrls(mediaUrls);
         post.setMediaTypes(mediaTypes);
 
-        return postRepository.save(post);
+        //return postRepository.save(post);
+
+        // Save the post first         added by nethmi
+        Post savedPost = postRepository.save(post);
+
+        // Fetch user to get username       added by nethmi
+        User user = userRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Create and save notification in notifications collection        added by nethmi
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setUsername(user.getUsername());
+        notification.setDescription(user.getUsername() + " added a new post.");
+        notification.setRead(false);
+        notification.setTimestamp(LocalDateTime.now());
+
+         notificationRepository.save(notification);
+
+         return savedPost;   // added by nethmi
+        
+
     }
 
     public List<Post> getAllPosts() {
@@ -166,4 +202,8 @@ public class PostService {
         return contentType != null && 
                (contentType.startsWith("image/") || contentType.startsWith("video/"));
     }
+
+    
+    
+    
 } 
