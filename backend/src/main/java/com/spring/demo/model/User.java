@@ -25,5 +25,6 @@ public class User {
     
     // Getters and setters (omitted for brevity, use Lombok @Data)
 
-
 }
+}
+
