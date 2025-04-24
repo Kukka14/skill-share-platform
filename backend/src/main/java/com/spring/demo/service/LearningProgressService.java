@@ -30,6 +30,42 @@ public class LearningProgressService {
         return convertToDTO(savedProgress);
     }
 
+    public LearningProgressDTO updateProgressUpdate(String id, LearningProgressDTO progressDTO) {
+        LearningProgress existingProgress = learningProgressRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Learning progress not found with id: " + id));
+
+        // Store old completed items
+        String oldCompletedItems = existingProgress.getCompletedItems();
+        
+        // Update other fields
+        existingProgress.setTitle(progressDTO.getTitle());
+        existingProgress.setDescription(progressDTO.getDescription());
+        existingProgress.setTemplateType(progressDTO.getTemplateType());
+        
+        // Merge old and new completed items
+        if (progressDTO.getCompletedItems() != null && !progressDTO.getCompletedItems().isEmpty()) {
+            if (oldCompletedItems != null && !oldCompletedItems.isEmpty()) {
+                // If both old and new items exist, combine them with a separator
+                existingProgress.setCompletedItems(oldCompletedItems + " | " + progressDTO.getCompletedItems());
+            } else {
+                // If only new items exist, use them directly
+                existingProgress.setCompletedItems(progressDTO.getCompletedItems());
+            }
+        }
+        
+        existingProgress.setNewSkills(progressDTO.getNewSkills());
+
+        LearningProgress updatedProgress = learningProgressRepository.save(existingProgress);
+        return convertToDTO(updatedProgress);
+    }
+
+    public void deleteProgressUpdate(String id) {
+        LearningProgress existingProgress = learningProgressRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Learning progress not found with id: " + id));
+        
+        learningProgressRepository.delete(existingProgress);
+    }
+
     public List<LearningProgressDTO> getUserProgressUpdates(String userId) {
         return learningProgressRepository.findByUserId(userId)
                 .stream()
