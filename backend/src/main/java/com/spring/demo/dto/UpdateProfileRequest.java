@@ -9,4 +9,4 @@ public class UpdateProfileRequest {
     private String lastName;
     private String bio;
     private MultipartFile profileImage;
-}
+} 
