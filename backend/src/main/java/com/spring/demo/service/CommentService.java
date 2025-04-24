@@ -7,6 +7,13 @@ import com.spring.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+//added by nethmi
+import com.spring.demo.model.Notification;
+import com.spring.demo.model.Post;
+import com.spring.demo.repository.NotificationRepository;
+import com.spring.demo.repository.PostRepository;
+
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +26,14 @@ public class CommentService {
 
     @Autowired
     private UserRepository userRepository;
+    
+    //added by nethmi
+    @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
+    private PostRepository postRepository;
+
 
     // Create a new comment
     public Comment createComment(String userId, String postId, String content) {
@@ -37,7 +52,30 @@ public class CommentService {
         comment.setCreatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
         comment.setUpdatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
         
-        return commentRepository.save(comment);
+        //added by nethmi
+        Comment savedComment = commentRepository.save(comment);
+
+        // Fetch the post to get the owner's userId
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        // Create the notification
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setUsername(user.getUsername());
+        notification.setPostId(postId);
+        notification.setPostUserId(post.getUserId());
+        notification.setDescription(user.getUsername() + " commented on a post.");
+        notification.setRead(false);
+        notification.setTimestamp(LocalDateTime.now());
+
+        // Save to notifications collection
+        notificationRepository.save(notification);
+
+        return savedComment;
+        
+        //return commentRepository.save(comment);
+
     }
 
     // Update an existing comment
