@@ -1,12 +1,20 @@
 package com.spring.demo.service;
 
 import com.spring.demo.model.Like;
+import com.spring.demo.model.Notification;
 import com.spring.demo.model.User;
 import com.spring.demo.repository.LikeRepository;
+import com.spring.demo.repository.NotificationRepository;
 import com.spring.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+//added by nethmi
+import com.spring.demo.model.Post;      
+import com.spring.demo.repository.PostRepository;
+
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +26,14 @@ public class LikeService {
 
     @Autowired
     private UserRepository userRepository;
+    
+    //added by nethmi
+    @Autowired
+    private PostRepository postRepository;
+    @Autowired
+    private NotificationRepository notificationRepository;
+
+
 
     // Create a new like
     public Like createLike(String userId, String postId) {
@@ -32,7 +48,32 @@ public class LikeService {
         like.setUserId(userId);
         like.setPostId(postId);
 
-        return likeRepository.save(like);
+        Like savedLike = likeRepository.save(like);
+
+       
+
+        // Fetch the liking user
+        User likingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Liking user not found"));
+
+        // Fetch the liked post
+        Post likedPost = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        // Create the notification
+        Notification notification = new Notification();
+        notification.setUserId(userId); // who liked
+        notification.setUsername(likingUser.getUsername());
+        notification.setPostId(postId);
+        notification.setPostUserId(likedPost.getUserId()); // post owner's ID
+        notification.setDescription(likingUser.getUsername() + " liked a post.");
+        notification.setRead(false);
+        notification.setTimestamp(LocalDateTime.now());
+
+        notificationRepository.save(notification);
+
+        return savedLike;
+
     }
 
     // Remove a like
