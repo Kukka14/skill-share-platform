@@ -9,6 +9,10 @@ import com.spring.demo.exception.CustomException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+//added by nethmi
+import com.spring.demo.model.Notification;
+import com.spring.demo.repository.NotificationRepository;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,11 +26,16 @@ import java.util.stream.Collectors;
 public class StatusService {
     private final StatusRepository statusRepository;
     private final UserRepository userRepository;
+
+    private final NotificationRepository notificationRepository;
+
+
     private final String uploadPath = "./uploads/status";
 
-    public StatusService(StatusRepository statusRepository, UserRepository userRepository) {
+    public StatusService(StatusRepository statusRepository, UserRepository userRepository,NotificationRepository notificationRepository) {
         this.statusRepository = statusRepository;
         this.userRepository = userRepository;
+        this.notificationRepository = notificationRepository;//added by nethmi 
     }
 
     public Status createStatus(String username, String text, MultipartFile image) throws IOException {
@@ -60,7 +69,27 @@ public class StatusService {
             status.setImageUrl("/status-images/" + filename);
         }
 
-        return statusRepository.save(status);
+        //return statusRepository.save(status);
+
+
+        // added by nethmi 
+        Status savedStatus = statusRepository.save(status);
+
+            // ✅ Create a notification
+            Notification notification = new Notification();
+            notification.setUserId(user.getId());
+            notification.setUsername(user.getUsername());
+            notification.setDescription(user.getUsername() + " created a new status.");
+            notification.setRead(false);
+            notification.setTimestamp(LocalDateTime.now());
+
+            // Save the notification
+            notificationRepository.save(notification);
+
+            return savedStatus;
+
+
+
     }
 
     public Status updateStatus(String statusId, String username, String text, MultipartFile image) throws IOException {

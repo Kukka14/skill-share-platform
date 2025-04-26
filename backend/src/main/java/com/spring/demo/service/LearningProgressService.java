@@ -5,6 +5,12 @@ import com.spring.demo.model.LearningProgress;
 import com.spring.demo.repository.LearningProgressRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+//added by nethmi 
+import com.spring.demo.model.Notification;
+import com.spring.demo.model.User;
+import com.spring.demo.repository.NotificationRepository;
+import com.spring.demo.repository.UserRepository;
+
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +21,13 @@ public class LearningProgressService {
 
     @Autowired
     private LearningProgressRepository learningProgressRepository;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
 
     public LearningProgressDTO createProgressUpdate(LearningProgressDTO progressDTO) {
         LearningProgress progress = new LearningProgress();
@@ -27,8 +40,22 @@ public class LearningProgressService {
         progress.setCreatedAt(LocalDateTime.now());
 
         LearningProgress savedProgress = learningProgressRepository.save(progress);
+       
+        User user = userRepository.findById(progressDTO.getUserId())
+        .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Notification notification = new Notification();
+        notification.setUserId(user.getId());
+        notification.setUsername(user.getUsername());
+        notification.setDescription(user.getUsername() + " shared a learning progress update.");
+        notification.setRead(false);
+        notification.setTimestamp(LocalDateTime.now());
+
+        notificationRepository.save(notification);
+
         return convertToDTO(savedProgress);
-    }
+
+ }
 
     public LearningProgressDTO updateProgressUpdate(String id, LearningProgressDTO progressDTO) {
         LearningProgress existingProgress = learningProgressRepository.findById(id)
