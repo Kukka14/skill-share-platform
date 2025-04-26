@@ -5,6 +5,11 @@ import com.spring.demo.service.NotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.CollectionModel;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
+
+
 import java.util.List;
 
 @RestController
@@ -17,19 +22,40 @@ public class NotificationController {
         this.notificationService = notificationService;
     }
 
-    // Get all notifications for a user
-    @GetMapping("/{userId}")
-    public ResponseEntity<List<Notification>> getNotificationsByUserId(@PathVariable String userId) {
-        List<Notification> notifications = notificationService.getNotificationsByUserId(userId);
-        return ResponseEntity.ok(notifications);
+    
+
+    @GetMapping("/{notificationId}")
+    public ResponseEntity<Notification> getNotificationById(@PathVariable String notificationId) {
+        Notification notification = notificationService.getById(notificationId);
+        return ResponseEntity.ok(notification);
     }
 
+
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<CollectionModel<EntityModel<Notification>>> getNotificationsByUserId(@PathVariable String userId) {
+        List<Notification> notifications = notificationService.getNotificationsByUserId(userId);
+
+        List<EntityModel<Notification>> notificationModels = notifications.stream()
+            .map(notification -> EntityModel.of(notification,
+                linkTo(methodOn(NotificationController.class).getNotificationById(notification.getNotificationId())).withSelfRel(),
+                linkTo(methodOn(NotificationController.class).markAsRead(notification.getNotificationId())).withRel("markAsRead"),
+                linkTo(methodOn(NotificationController.class).deleteNotification(notification.getNotificationId())).withRel("delete")
+            ))
+            .toList();
+
+        return ResponseEntity.ok(CollectionModel.of(notificationModels));
+    }
+
+
+
     // Mark a specific notification as read
-    @PutMapping("/mark-as-read/{notificationId}")
+    @PutMapping("/{notificationId}/read")
     public ResponseEntity<String> markAsRead(@PathVariable String notificationId) {
         notificationService.markAsRead(notificationId);
         return ResponseEntity.ok("Notification marked as read successfully.");
     }
+
 
     @DeleteMapping("/{notificationId}")
     public ResponseEntity<String> deleteNotification(@PathVariable String notificationId) {
@@ -42,7 +68,7 @@ public class NotificationController {
 }
 
 
-@DeleteMapping("/bulk-delete")
+@DeleteMapping("/bulk")
 public ResponseEntity<String> deleteMultipleNotifications(@RequestBody List<String> notificationIds) {
     try {
         notificationService.deleteMultipleNotifications(notificationIds);
