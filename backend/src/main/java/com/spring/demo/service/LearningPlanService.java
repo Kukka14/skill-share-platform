@@ -11,6 +11,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+//added by nethmi 
+import com.spring.demo.model.Notification;
+import com.spring.demo.repository.NotificationRepository;
+
 @Service
 public class LearningPlanService {
     
@@ -19,6 +23,10 @@ public class LearningPlanService {
     
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
+
     
     public LearningPlanDTO createLearningPlan(LearningPlanDTO learningPlanDTO, String creatorId) {
         User creator = userRepository.findById(creatorId)
@@ -57,8 +65,23 @@ public class LearningPlanService {
             })
             .collect(Collectors.toList()));
             
+        // LearningPlan savedPlan = learningPlanRepository.save(learningPlan);
+        // return convertToDTO(savedPlan);
+
         LearningPlan savedPlan = learningPlanRepository.save(learningPlan);
-        return convertToDTO(savedPlan);
+
+            // ✨ Create Notification
+            Notification notification = new Notification();
+            notification.setUserId(creator.getId());
+            notification.setUsername(creator.getUsername());
+            notification.setDescription(creator.getUsername() + " created a new learning plan.");
+            notification.setRead(false);
+            notification.setTimestamp(LocalDateTime.now());
+
+            notificationRepository.save(notification);
+
+            return convertToDTO(savedPlan);
+
     }
     
     public LearningPlanDTO updateLearningPlan(String planId, LearningPlanDTO learningPlanDTO) {
