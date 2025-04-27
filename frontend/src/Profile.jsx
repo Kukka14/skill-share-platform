@@ -16,10 +16,25 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [statuses, setStatuses] = useState([]);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [newStatusText, setNewStatusText] = useState('');
+  const [newStatusImage, setNewStatusImage] = useState(null);
+  const [statusImagePreview, setStatusImagePreview] = useState('');
+  const [selectedStatusIndex, setSelectedStatusIndex] = useState(null);
+  const [isViewingStatus, setIsViewingStatus] = useState(false);
+  const [statusUpdateTime, setStatusUpdateTime] = useState(null);
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
+  const [editingStatusId, setEditingStatusId] = useState(null);
+  const [editingStatusText, setEditingStatusText] = useState('');
+  const [editingStatusImage, setEditingStatusImage] = useState(null);
+  const [editingStatusImagePreview, setEditingStatusImagePreview] = useState('');
   const navigate = useNavigate();
+  const BACKEND_URL = 'http://localhost:8080';
 
   useEffect(() => {
     fetchUserProfile();
+    fetchUserStatuses();
   }, []);
 
   const fetchUserProfile = async () => {
@@ -60,6 +75,30 @@ export default function Profile() {
     }
   };
 
+  const fetchUserStatuses = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch('http://localhost:8080/api/status/user', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch statuses');
+      }
+
+      const data = await response.json();
+      setStatuses(data);
+    } catch (error) {
+      console.error('Status fetch error:', error);
+    }
+  };
+
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -69,6 +108,19 @@ export default function Profile() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleStatusImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setNewStatusImage(file);
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setStatusImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
     }
@@ -116,10 +168,171 @@ export default function Profile() {
     }
   };
 
+  const handleCreateStatus = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const formData = new FormData();
+    if (newStatusImage) {
+      formData.append('image', newStatusImage);
+    }
+    if (newStatusText) {
+      formData.append('text', newStatusText);
+    }
+
+    try {
+      const response = await fetch('http://localhost:8080/api/status', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create status');
+      }
+
+      const newStatus = await response.json();
+      setStatuses([newStatus, ...statuses]);
+      setIsStatusModalOpen(false);
+      setNewStatusText('');
+      setNewStatusImage(null);
+      setStatusImagePreview('');
+    } catch (error) {
+      setError('Failed to create status');
+      console.error('Status creation error:', error);
+    }
+  };
+
+  const handleUpdateStatus = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const formData = new FormData();
+    if (editingStatusImage) {
+      formData.append('image', editingStatusImage);
+    }
+    if (editingStatusText) {
+      formData.append('text', editingStatusText);
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/status/${editingStatusId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+
+      const updatedStatus = await response.json();
+      setStatuses(statuses.map(status => 
+        status.id === editingStatusId ? updatedStatus : status
+      ));
+      setIsEditingStatus(false);
+      setEditingStatusId(null);
+      setEditingStatusText('');
+      setEditingStatusImage(null);
+      setEditingStatusImagePreview('');
+      setStatusUpdateTime(new Date());
+    } catch (error) {
+      setError('Failed to update status');
+      console.error('Status update error:', error);
+    }
+  };
+
+  const handleEditStatus = (status) => {
+    setEditingStatusId(status.id);
+    setEditingStatusText(status.text || '');
+    setEditingStatusImagePreview(status.imageUrl || '');
+    setIsEditingStatus(true);
+  };
+
+  const handleDeleteStatus = async (statusId) => {
+    if (!window.confirm('Are you sure you want to delete this status?')) {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/status/${statusId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete status');
+      }
+
+      setStatuses(statuses.filter(status => status.id !== statusId));
+      setStatusUpdateTime(new Date());
+    } catch (error) {
+      setError('Failed to delete status');
+      console.error('Status deletion error:', error);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     navigate('/login');
+  };
+
+  const handleStatusClick = (index) => {
+    setSelectedStatusIndex(index);
+    setIsViewingStatus(true);
+  };
+
+  const handleNextStatus = () => {
+    if (selectedStatusIndex < statuses.length - 1) {
+      setSelectedStatusIndex(selectedStatusIndex + 1);
+    } else {
+      setIsViewingStatus(false);
+    }
+  };
+
+  const handlePrevStatus = () => {
+    if (selectedStatusIndex > 0) {
+      setSelectedStatusIndex(selectedStatusIndex - 1);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (isViewingStatus) {
+      if (e.key === 'ArrowRight') {
+        handleNextStatus();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevStatus();
+      } else if (e.key === 'Escape') {
+        setIsViewingStatus(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isViewingStatus, selectedStatusIndex]);
+
+  // Helper function to get full image URL
+  const getFullImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    // The image path should already be in the correct format (/uploads/status/filename)
+    return `${BACKEND_URL}${imagePath}`;
   };
 
   if (isLoading) {
@@ -141,17 +354,272 @@ export default function Profile() {
               </div>
             )}
             
+            {/* Status Section */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">My Status</h2>
+                <div className="flex items-center space-x-4">
+                  {statusUpdateTime && (
+                    <span className="text-sm text-gray-500">
+                      Last updated: {new Date(statusUpdateTime).toLocaleTimeString()}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setIsStatusModalOpen(true)}
+                    className="rounded-full bg-blue-600 p-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex space-x-4 overflow-x-auto pb-4">
+                {statuses.map((status, index) => (
+                  <div
+                    key={status.id}
+                    onClick={() => handleStatusClick(index)}
+                    className="flex-shrink-0 cursor-pointer"
+                  >
+                    <div className="relative">
+                      <div className="h-20 w-20 rounded-full overflow-hidden border-4 border-blue-500">
+                        {status.imageUrl && (
+                          <img
+                            src={getFullImageUrl(status.imageUrl)}
+                            alt="Status"
+                            className="h-full w-full object-cover"
+                          />
+                        )}
+                      </div>
+                      {index === 0 && (
+                        <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white"></div>
+                      )}
+                    </div>
+                    <p className="mt-2 text-center text-sm text-gray-600 truncate w-20">
+                      {status.text || 'No text'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Status View Modal */}
+            {isViewingStatus && selectedStatusIndex !== null && (
+              <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
+                <div className="relative w-full h-full">
+                  <div className="absolute top-4 right-4 flex space-x-2">
+                    <button
+                      onClick={() => handleEditStatus(statuses[selectedStatusIndex])}
+                      className="text-white bg-black bg-opacity-50 rounded-full p-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStatus(statuses[selectedStatusIndex].id)}
+                      className="text-white bg-black bg-opacity-50 rounded-full p-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setIsViewingStatus(false)}
+                      className="text-white bg-black bg-opacity-50 rounded-full p-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {selectedStatusIndex > 0 && (
+                    <button
+                      onClick={handlePrevStatus}
+                      className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white bg-black bg-opacity-50 rounded-full p-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                  )}
+                  
+                  <div className="h-full flex items-center justify-center">
+                    <div className="max-w-2xl w-full">
+                      {statuses[selectedStatusIndex].imageUrl && (
+                        <img
+                          src={getFullImageUrl(statuses[selectedStatusIndex].imageUrl)}
+                          alt="Status"
+                          className="w-full h-[80vh] object-contain"
+                        />
+                      )}
+                      {statuses[selectedStatusIndex].text && (
+                        <div className="absolute bottom-20 left-0 right-0 p-4 bg-black bg-opacity-50 text-white">
+                          <p className="text-center">{statuses[selectedStatusIndex].text}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {selectedStatusIndex < statuses.length - 1 && (
+                    <button
+                      onClick={handleNextStatus}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white bg-black bg-opacity-50 rounded-full p-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Status Creation Modal */}
+            {isStatusModalOpen && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                  <h3 className="text-lg font-semibold mb-4">Create New Status</h3>
+                  <form onSubmit={handleCreateStatus}>
+                    <div className="mb-4">
+                      <textarea
+                        value={newStatusText}
+                        onChange={(e) => setNewStatusText(e.target.value)}
+                        placeholder="What's on your mind?"
+                        className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+                        rows="3"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleStatusImageChange}
+                        className="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100"
+                      />
+                    </div>
+                    {statusImagePreview && (
+                      <div className="mb-4">
+                        <img
+                          src={statusImagePreview}
+                          alt="Preview"
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
+                    <div className="flex justify-end space-x-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsStatusModalOpen(false);
+                          setNewStatusText('');
+                          setNewStatusImage(null);
+                          setStatusImagePreview('');
+                        }}
+                        className="rounded-md bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      >
+                        Post Status
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+            
+            {/* Status Edit Modal */}
+            {isEditingStatus && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                  <h3 className="text-lg font-semibold mb-4">Edit Status</h3>
+                  <form onSubmit={handleUpdateStatus}>
+                    <div className="mb-4">
+                      <textarea
+                        value={editingStatusText}
+                        onChange={(e) => setEditingStatusText(e.target.value)}
+                        placeholder="Update your status text"
+                        className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+                        rows="3"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            setEditingStatusImage(file);
+                            
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setEditingStatusImagePreview(reader.result);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="block w-full text-sm text-gray-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100"
+                      />
+                    </div>
+                    {editingStatusImagePreview && (
+                      <div className="mb-4">
+                        <img
+                          src={getFullImageUrl(editingStatusImagePreview)}
+                          alt="Preview"
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
+                    <div className="flex justify-end space-x-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingStatus(false);
+                          setEditingStatusId(null);
+                          setEditingStatusText('');
+                          setEditingStatusImage(null);
+                          setEditingStatusImagePreview('');
+                        }}
+                        className="rounded-md bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      >
+                        Update Status
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+            
             <div className="mb-8 text-center">
               <div className="mx-auto h-32 w-32 overflow-hidden rounded-full bg-gray-200">
                 {imagePreview ? (
                   <img
-                    src={imagePreview}
+                    src={getFullImageUrl(imagePreview)}
                     alt="Profile"
                     className="h-full w-full object-cover"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=random`;
-                    }}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-4xl text-gray-500">

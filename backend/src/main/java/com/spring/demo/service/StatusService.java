@@ -66,7 +66,7 @@ public class StatusService {
             Path filePath = uploadDir.resolve(filename);
             Files.copy(image.getInputStream(), filePath);
 
-            status.setImageUrl("/status-images/" + filename);
+            status.setImageUrl("http://localhost:8080/uploads/status/" + filename);
         }
 
         //return statusRepository.save(status);
@@ -127,7 +127,7 @@ public class StatusService {
             Path filePath = Paths.get(uploadPath, filename);
             Files.copy(image.getInputStream(), filePath);
 
-            status.setImageUrl("/status-images/" + filename);
+            status.setImageUrl("http://localhost:8080/uploads/status/" + filename);
         }
 
         return statusRepository.save(status);
