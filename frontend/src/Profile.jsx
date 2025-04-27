@@ -21,7 +21,8 @@ export default function Profile() {
   useEffect(() => {
     fetchUserProfile();
   }, []);
-
+  console.log('User ID:', userData.id);
+  localStorage.setItem('userId', userData.id);
   const fetchUserProfile = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
