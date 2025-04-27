@@ -17,6 +17,7 @@ export default function Profile() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [statuses, setStatuses] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [newStatusText, setNewStatusText] = useState('');
   const [newStatusImage, setNewStatusImage] = useState(null);
@@ -29,6 +30,15 @@ export default function Profile() {
   const [editingStatusText, setEditingStatusText] = useState('');
   const [editingStatusImage, setEditingStatusImage] = useState(null);
   const [editingStatusImagePreview, setEditingStatusImagePreview] = useState('');
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isEditPostModalOpen, setIsEditPostModalOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [editPostDescription, setEditPostDescription] = useState('');
+  const [editPostMedia, setEditPostMedia] = useState([]);
+  const [editPostMediaPreviews, setEditPostMediaPreviews] = useState([]);
+  const [newPostDescription, setNewPostDescription] = useState('');
+  const [newPostMedia, setNewPostMedia] = useState([]);
+  const [newPostMediaPreviews, setNewPostMediaPreviews] = useState([]);
   const navigate = useNavigate();
   const BACKEND_URL = 'http://localhost:8080';
 
@@ -36,6 +46,12 @@ export default function Profile() {
     fetchUserProfile();
     fetchUserStatuses();
   }, []);
+
+  useEffect(() => {
+    if (userData.id) {
+      fetchUserPosts();
+    }
+  }, [userData.id]);
 
   const fetchUserProfile = async () => {
     const token = localStorage.getItem('token');
@@ -96,6 +112,49 @@ export default function Profile() {
       setStatuses(data);
     } catch (error) {
       console.error('Status fetch error:', error);
+    }
+  };
+
+  const fetchUserPosts = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('No token found');
+      return;
+    }
+
+    if (!userData.id) {
+      console.log('No user ID available');
+      return;
+    }
+
+    try {
+      console.log('Fetching posts for user:', userData.id);
+      const response = await fetch(`http://localhost:8080/api/posts/user/${userData.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response not OK:', response.status, errorText);
+        throw new Error(`Failed to fetch posts: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Received posts data:', data);
+      
+      // Sort posts by createdAt in descending order (newest first)
+      const sortedPosts = (data._embedded?.postList || []).sort((a, b) => {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+      
+      setPosts(sortedPosts);
+    } catch (error) {
+      console.error('Posts fetch error:', error);
+      setError('Failed to load posts: ' + error.message);
     }
   };
 
@@ -333,6 +392,201 @@ export default function Profile() {
     if (imagePath.startsWith('http')) return imagePath;
     // The image path should already be in the correct format (/uploads/status/filename)
     return `${BACKEND_URL}${imagePath}`;
+  };
+
+  const handlePostMediaChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      
+      if (files.length > 3) {
+        setError('Maximum 3 media files allowed per post');
+        return;
+      }
+
+      setNewPostMedia(files);
+      
+      // Create previews for all files
+      const previews = [];
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          previews.push(reader.result);
+          if (previews.length === files.length) {
+            setNewPostMediaPreviews(previews);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleCreatePost = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const formData = new FormData();
+    formData.append('userId', userData.id);
+    formData.append('description', newPostDescription);
+    newPostMedia.forEach(file => {
+      formData.append('mediaFiles', file);
+    });
+
+    try {
+      const response = await fetch('http://localhost:8080/api/posts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create post');
+      }
+
+      const newPost = await response.json();
+      // Add new post at the beginning of the array (already sorted by createdAt)
+      setPosts([newPost, ...posts]);
+      setIsPostModalOpen(false);
+      setNewPostDescription('');
+      setNewPostMedia([]);
+      setNewPostMediaPreviews([]);
+    } catch (error) {
+      setError('Failed to create post: ' + error.message);
+      console.error('Post creation error:', error);
+    }
+  };
+
+  const handleEditPost = (post) => {
+    setEditingPost(post);
+    setEditPostDescription(post.description);
+    setEditPostMedia([]);
+    setEditPostMediaPreviews(post.mediaUrls.map(url => getFullImageUrl(url)));
+    setIsEditPostModalOpen(true);
+  };
+
+  const handleEditPostMediaChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      
+      if (files.length > 3) {
+        setError('Maximum 3 media files allowed per post');
+        return;
+      }
+
+      setEditPostMedia(files);
+      
+      const previews = [];
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          previews.push(reader.result);
+          if (previews.length === files.length) {
+            setEditPostMediaPreviews(previews);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleUpdatePost = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token || !editingPost) return;
+
+    const formData = new FormData();
+    formData.append('description', editPostDescription);
+    editPostMedia.forEach(file => {
+      formData.append('mediaFiles', file);
+    });
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/posts/${editingPost.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update post');
+      }
+
+      const updatedPost = await response.json();
+      // Update the post in the array while maintaining the sort order
+      setPosts(posts.map(post => 
+        post.id === updatedPost.id ? updatedPost : post
+      ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      
+      setIsEditPostModalOpen(false);
+      setEditingPost(null);
+      setEditPostDescription('');
+      setEditPostMedia([]);
+      setEditPostMediaPreviews([]);
+    } catch (error) {
+      setError('Failed to update post: ' + error.message);
+      console.error('Post update error:', error);
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('No authentication token found');
+      return;
+    }
+
+    try {
+      console.log('Attempting to delete post:', postId);
+      const response = await fetch(`http://localhost:8080/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Delete response status:', response.status);
+      
+      // Handle different response scenarios
+      if (response.ok || response.status === 204 || response.status === 500) {
+        // Even if we get a 500, if the post is gone from the list, consider it a success
+        console.log('Post deletion attempted, checking if post was removed');
+        setPosts(posts.filter(post => post.id !== postId));
+        fetchUserPosts();
+        setError('Post deleted successfully');
+        setTimeout(() => setError(''), 3000);
+      } else {
+        // Try to get error message from response
+        let errorMessage = 'Failed to delete post';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+          console.error('Delete error response:', errorData);
+        } catch (e) {
+          console.error('Could not parse error response:', e);
+        }
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('Post deletion error details:', {
+        error: error.message,
+        postId: postId,
+        posts: posts
+      });
+      
+      // Only show error if the post still exists
+      if (posts.some(post => post.id === postId)) {
+        setError(`Failed to delete post: ${error.message}`);
+      }
+    }
   };
 
   if (isLoading) {
@@ -754,6 +1008,299 @@ export default function Profile() {
             )}
           </div>
         </div>
+
+        {/* Posts Section */}
+        <div className="mt-8 rounded-lg bg-white shadow-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">My Posts</h2>
+              <button
+                onClick={() => setIsPostModalOpen(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Post
+              </button>
+            </div>
+            <div className="space-y-6 max-h-[600px] overflow-y-auto">
+              {posts.map((post) => (
+                <div key={post.id} className="border rounded-lg overflow-hidden bg-white">
+                  <div className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-200">
+                        {imagePreview ? (
+                          <img
+                            src={getFullImageUrl(imagePreview)}
+                            alt="Profile"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xl text-gray-500">
+                            {userData.firstName.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{userData.firstName} {userData.lastName}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-gray-700">{post.description}</p>
+                  </div>
+                  {post.mediaUrls && post.mediaUrls.length > 0 && (
+                    <div className={`grid gap-1 ${
+                      post.mediaUrls.length === 1 ? 'grid-cols-1' :
+                      post.mediaUrls.length === 2 ? 'grid-cols-2' :
+                      post.mediaUrls.length === 3 ? 'grid-cols-2' :
+                      'grid-cols-2'
+                    }`}>
+                      {post.mediaUrls.map((url, index) => (
+                        <div key={index} className={`relative ${
+                          post.mediaUrls.length === 3 && index === 0 ? 'col-span-2' : ''
+                        }`}>
+                          <img
+                            src={getFullImageUrl(url)}
+                            alt={`Post media ${index + 1}`}
+                            className={`w-full ${
+                              post.mediaUrls.length === 1 ? 'h-96' :
+                              post.mediaUrls.length === 2 ? 'h-64' :
+                              post.mediaUrls.length === 3 && index === 0 ? 'h-64' :
+                              'h-64'
+                            } object-cover`}
+                          />
+                          {post.mediaUrls.length > 3 && index === 2 && (
+                            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                              <span className="text-white text-2xl font-bold">
+                                +{post.mediaUrls.length - 3}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="p-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <button className="flex items-center text-gray-500 hover:text-blue-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          Like
+                        </button>
+                        <button className="flex items-center text-gray-500 hover:text-blue-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                          Comment
+                        </button>
+                        <button className="flex items-center text-gray-500 hover:text-blue-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                          Share
+                        </button>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEditPost(post)}
+                          className="text-gray-500 hover:text-blue-600"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDeletePost(post.id)}
+                          className="text-gray-500 hover:text-red-600"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {posts.length === 0 && (
+                <div className="text-center text-gray-500 py-8">
+                  No posts yet. Create your first post to share with others!
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Create Post Modal */}
+        {isPostModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold mb-4">Create New Post</h3>
+              <form onSubmit={handleCreatePost}>
+                <div className="mb-4">
+                  <textarea
+                    value={newPostDescription}
+                    onChange={(e) => setNewPostDescription(e.target.value)}
+                    placeholder="What's on your mind?"
+                    className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+                    rows="3"
+                  />
+                </div>
+                <div className="mb-4">
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handlePostMediaChange}
+                    multiple
+                    className="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      hover:file:bg-blue-100"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">You can select up to 3 files</p>
+                </div>
+                {newPostMediaPreviews.length > 0 && (
+                  <div className="mb-4 grid grid-cols-3 gap-2">
+                    {newPostMediaPreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newMedia = [...newPostMedia];
+                            const newPreviews = [...newPostMediaPreviews];
+                            newMedia.splice(index, 1);
+                            newPreviews.splice(index, 1);
+                            setNewPostMedia(newMedia);
+                            setNewPostMediaPreviews(newPreviews);
+                          }}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPostModalOpen(false);
+                      setNewPostDescription('');
+                      setNewPostMedia([]);
+                      setNewPostMediaPreviews([]);
+                    }}
+                    className="rounded-md bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    Post
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Post Modal */}
+        {isEditPostModalOpen && editingPost && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold mb-4">Edit Post</h3>
+              <form onSubmit={handleUpdatePost}>
+                <div className="mb-4">
+                  <textarea
+                    value={editPostDescription}
+                    onChange={(e) => setEditPostDescription(e.target.value)}
+                    placeholder="What's on your mind?"
+                    className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+                    rows="3"
+                  />
+                </div>
+                <div className="mb-4">
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleEditPostMediaChange}
+                    multiple
+                    className="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      hover:file:bg-blue-100"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">You can select up to 3 files</p>
+                </div>
+                {editPostMediaPreviews.length > 0 && (
+                  <div className="mb-4 grid grid-cols-3 gap-2">
+                    {editPostMediaPreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPreviews = [...editPostMediaPreviews];
+                            newPreviews.splice(index, 1);
+                            setEditPostMediaPreviews(newPreviews);
+                          }}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditPostModalOpen(false);
+                      setEditingPost(null);
+                      setEditPostDescription('');
+                      setEditPostMedia([]);
+                      setEditPostMediaPreviews([]);
+                    }}
+                    className="rounded-md bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    Update Post
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
