@@ -62,7 +62,7 @@ public class UserService {
             Files.copy(request.getProfileImage().getInputStream(), filePath);
 
             // Update profile image URL
-            user.setProfileImageUrl("/profile-images/" + filename);
+            user.setProfileImageUrl("http://localhost:8080/uploads/" + filename);
         }
 
         return userRepository.save(user);
