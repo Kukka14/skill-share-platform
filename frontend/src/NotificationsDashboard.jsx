@@ -50,7 +50,6 @@ export default function NotificationsDashboard() {
       if (!response.ok) {
         throw new Error('Failed to mark notification as read');
       }
-
       // Update state locally without refetching
       setNotifications((prev) =>
         prev.map((n) =>
