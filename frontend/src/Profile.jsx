@@ -410,7 +410,10 @@ export default function Profile() {
       files.forEach(file => {
         const reader = new FileReader();
         reader.onloadend = () => {
-          previews.push(reader.result);
+          previews.push({
+            url: reader.result,
+            type: file.type
+          });
           if (previews.length === files.length) {
             setNewPostMediaPreviews(previews);
           }
@@ -481,7 +484,10 @@ export default function Profile() {
       files.forEach(file => {
         const reader = new FileReader();
         reader.onloadend = () => {
-          previews.push(reader.result);
+          previews.push({
+            url: reader.result,
+            type: file.type
+          });
           if (previews.length === files.length) {
             setEditPostMediaPreviews(previews);
           }
@@ -1062,16 +1068,29 @@ export default function Profile() {
                         <div key={index} className={`relative ${
                           post.mediaUrls.length === 3 && index === 0 ? 'col-span-2' : ''
                         }`}>
-                          <img
-                            src={getFullImageUrl(url)}
-                            alt={`Post media ${index + 1}`}
-                            className={`w-full ${
-                              post.mediaUrls.length === 1 ? 'h-96' :
-                              post.mediaUrls.length === 2 ? 'h-64' :
-                              post.mediaUrls.length === 3 && index === 0 ? 'h-64' :
-                              'h-64'
-                            } object-cover`}
-                          />
+                          {post.mediaTypes && post.mediaTypes[index]?.startsWith('video/') ? (
+                            <video
+                              src={getFullImageUrl(url)}
+                              className={`w-full ${
+                                post.mediaUrls.length === 1 ? 'h-96' :
+                                post.mediaUrls.length === 2 ? 'h-64' :
+                                post.mediaUrls.length === 3 && index === 0 ? 'h-64' :
+                                'h-64'
+                              } object-cover`}
+                              controls
+                            />
+                          ) : (
+                            <img
+                              src={getFullImageUrl(url)}
+                              alt={`Post media ${index + 1}`}
+                              className={`w-full ${
+                                post.mediaUrls.length === 1 ? 'h-96' :
+                                post.mediaUrls.length === 2 ? 'h-64' :
+                                post.mediaUrls.length === 3 && index === 0 ? 'h-64' :
+                                'h-64'
+                              } object-cover`}
+                            />
+                          )}
                           {post.mediaUrls.length > 3 && index === 2 && (
                             <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                               <span className="text-white text-2xl font-bold">
@@ -1170,11 +1189,19 @@ export default function Profile() {
                   <div className="mb-4 grid grid-cols-3 gap-2">
                     {newPostMediaPreviews.map((preview, index) => (
                       <div key={index} className="relative">
-                        <img
-                          src={preview}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
+                        {preview.type.startsWith('video/') ? (
+                          <video
+                            src={preview.url}
+                            className="w-full h-32 object-cover rounded-lg"
+                            controls
+                          />
+                        ) : (
+                          <img
+                            src={preview.url}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg"
+                          />
+                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -1254,11 +1281,19 @@ export default function Profile() {
                   <div className="mb-4 grid grid-cols-3 gap-2">
                     {editPostMediaPreviews.map((preview, index) => (
                       <div key={index} className="relative">
-                        <img
-                          src={preview}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
+                        {preview.type?.startsWith('video/') ? (
+                          <video
+                            src={preview.url}
+                            className="w-full h-32 object-cover rounded-lg"
+                            controls
+                          />
+                        ) : (
+                          <img
+                            src={preview.url}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg"
+                          />
+                        )}
                         <button
                           type="button"
                           onClick={() => {
