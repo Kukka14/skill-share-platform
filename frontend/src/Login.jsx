@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Login() {
+export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -41,8 +41,13 @@ export default function Login() {
       console.log('Login successful, received data:', data);
       
       if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('username', username);
+        // Call the onLogin prop with user data
+        onLogin({
+          token: data.token,
+          username: username,
+          // Add any other user data from the response
+          ...data.userData
+        });
         navigate('/profile');
       } else {
         throw new Error('No token received in response');

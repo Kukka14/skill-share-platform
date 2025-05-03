@@ -39,6 +39,12 @@ export default function Profile() {
   const [newPostDescription, setNewPostDescription] = useState('');
   const [newPostMedia, setNewPostMedia] = useState([]);
   const [newPostMediaPreviews, setNewPostMediaPreviews] = useState([]);
+  const [likes, setLikes] = useState({});  // Store likes count for each post
+  const [userLikes, setUserLikes] = useState([]); // Store posts liked by user
+  const [comments, setComments] = useState({}); // Store comments for each post
+  const [newComment, setNewComment] = useState(''); // Store new comment text
+  const [showComments, setShowComments] = useState({}); // Track which posts have expanded comments
+  const [commentInputVisible, setCommentInputVisible] = useState({}); // Track which posts show comment input
   const navigate = useNavigate();
   const BACKEND_URL = 'http://localhost:8080';
 
@@ -52,6 +58,12 @@ export default function Profile() {
       fetchUserPosts();
     }
   }, [userData.id]);
+
+  useEffect(() => {
+    if (posts.length > 0) {
+      fetchLikesAndComments();
+    }
+  }, [posts]);
 
   const fetchUserProfile = async () => {
     const token = localStorage.getItem('token');
@@ -158,6 +170,49 @@ export default function Profile() {
     }
   };
 
+  const fetchLikesAndComments = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+  
+    try {
+      // Fetch likes for all posts
+      const likesPromises = posts.map(post =>
+        fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes/count`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).then(res => res.json())
+      );
+  
+      // Fetch user's likes
+      const userLikesResponse = await fetch(`${BACKEND_URL}/api/interactions/users/${userData.id}/likes`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const userLikesData = await userLikesResponse.json();
+      setUserLikes(userLikesData.map(like => like.postId));
+  
+      // Fetch latest comments for all posts
+      const commentsPromises = posts.map(post =>
+        fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/comments/latest?limit=3`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).then(res => res.json())
+      );
+  
+      const likeCounts = await Promise.all(likesPromises);
+      const commentsList = await Promise.all(commentsPromises);
+  
+      const newLikes = {};
+      const newComments = {};
+      posts.forEach((post, index) => {
+        newLikes[post.id] = likeCounts[index];
+        newComments[post.id] = commentsList[index];
+      });
+  
+      setLikes(newLikes);
+      setComments(newComments);
+    } catch (error) {
+      console.error('Error fetching likes and comments:', error);
+    }
+  };
+  
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -595,6 +650,62 @@ export default function Profile() {
     }
   };
 
+  const handleLike = async (postId) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+  
+    try {
+      if (userLikes.includes(postId)) {
+        // Unlike
+        await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${userData.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setUserLikes(userLikes.filter(id => id !== postId));
+        setLikes({ ...likes, [postId]: likes[postId] - 1 });
+      } else {
+        // Like
+        await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${userData.id}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setUserLikes([...userLikes, postId]);
+        setLikes({ ...likes, [postId]: (likes[postId] || 0) + 1 });
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+  
+  const handleComment = async (postId) => {
+    const token = localStorage.getItem('token');
+    if (!token || !newComment.trim()) return;
+  
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: userData.id,
+          content: newComment
+        })
+      });
+  
+      const newCommentData = await response.json();
+      setComments({
+        ...comments,
+        [postId]: [newCommentData, ...(comments[postId] || [])]
+      });
+      setNewComment('');
+      setCommentInputVisible({ ...commentInputVisible, [postId]: false });
+    } catch (error) {
+      console.error('Error posting comment:', error);
+    }
+  };
+  
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -1105,23 +1216,37 @@ export default function Profile() {
                   <div className="p-4 border-t">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <button className="flex items-center text-gray-500 hover:text-blue-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <button 
+                          onClick={() => handleLike(post.id)}
+                          className={`flex items-center ${
+                            userLikes.includes(post.id) 
+                              ? 'text-blue-600' 
+                              : 'text-gray-500 hover:text-blue-600'
+                          }`}
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-5 w-5 mr-1" 
+                            fill={userLikes.includes(post.id) ? "currentColor" : "none"} 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
-                          Like
+                          {likes[post.id] || 0} Likes
                         </button>
-                        <button className="flex items-center text-gray-500 hover:text-blue-600">
+                        
+                        <button 
+                          onClick={() => {
+                            setShowComments({ ...showComments, [post.id]: !showComments[post.id] });
+                            setCommentInputVisible({ ...commentInputVisible, [post.id]: true });
+                          }}
+                          className="flex items-center text-gray-500 hover:text-blue-600"
+                        >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                           </svg>
-                          Comment
-                        </button>
-                        <button className="flex items-center text-gray-500 hover:text-blue-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                          </svg>
-                          Share
+                          {(comments[post.id]?.length || 0)} Comments
                         </button>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -1143,6 +1268,51 @@ export default function Profile() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Comments Section */}
+                    {showComments[post.id] && (
+                      <div className="mt-4">
+                        <div className="space-y-4">
+                          {comments[post.id]?.map((comment) => (
+                            <div key={comment.id} className="flex space-x-3">
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200">
+                                {/* Add user avatar here if available */}
+                              </div>
+                              <div className="flex-grow">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {comment.userId === userData.id ? 'You' : 'User'} {/* Replace with actual username */}
+                                </p>
+                                <p className="text-sm text-gray-500">{comment.content}</p>
+                                <p className="text-xs text-gray-400">
+                                  {new Date(comment.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Comment Input */}
+                        {commentInputVisible[post.id] && (
+                          <div className="mt-4 flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                              placeholder="Write a comment..."
+                              className="flex-grow rounded-full border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
+                            />
+                            <button
+                              onClick={() => handleComment(post.id)}
+                              className="rounded-full bg-blue-600 p-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1339,4 +1509,4 @@ export default function Profile() {
       </div>
     </div>
   );
-} 
+}
