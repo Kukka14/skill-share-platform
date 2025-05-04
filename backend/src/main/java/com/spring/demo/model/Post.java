@@ -13,6 +13,7 @@ public class Post {
     private List<String> mediaUrls; // URLs to the stored media files
     private List<String> mediaTypes; // Types of media (photo/video)
     private long createdAt;
+    private User user; // Added field to store user information
 
     // Getters and Setters
     public String getId() {
@@ -62,4 +63,12 @@ public class Post {
     public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
-} 
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+}

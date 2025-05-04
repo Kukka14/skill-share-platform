@@ -61,6 +61,7 @@ export default function Profile() {
     }
 
     try {
+      console.log('Fetching user profile...');
       const response = await fetch('http://localhost:8080/api/users/me', {
         method: 'GET',
         headers: {
@@ -79,13 +80,14 @@ export default function Profile() {
       }
 
       const data = await response.json();
+      console.log('Fetched user profile data:', data);
       setUserData(data);
       if (data.profileImageUrl) {
         setImagePreview(data.profileImageUrl);
       }
     } catch (error) {
+      console.error('Profile fetch error:', error);
       setError('Failed to load profile data');
-      console.error('Profile error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -151,6 +153,7 @@ export default function Profile() {
         return new Date(b.createdAt) - new Date(a.createdAt);
       });
       
+      console.log('Sorted posts:', sortedPosts);
       setPosts(sortedPosts);
     } catch (error) {
       console.error('Posts fetch error:', error);
@@ -1036,10 +1039,10 @@ export default function Profile() {
                   <div className="p-4">
                     <div className="flex items-center space-x-3">
                       <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-200">
-                        {imagePreview ? (
+                        {userData.profileImageUrl ? (
                           <img
-                            src={getFullImageUrl(imagePreview)}
-                            alt="Profile"
+                            src={getFullImageUrl(userData.profileImageUrl)}
+                            alt={`${userData.firstName}'s profile`}
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -1339,4 +1342,4 @@ export default function Profile() {
       </div>
     </div>
   );
-} 
+}
