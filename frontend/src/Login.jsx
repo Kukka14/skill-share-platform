@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -7,6 +8,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -14,45 +16,22 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      console.log('Attempting to connect to:', 'http://localhost:8080/api/auth/login');
-      
-      const response = await fetch('http://localhost:8080/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify({
-          username: username,
-          password: password
-        })
-      });
-
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error occurred' }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Login successful, received data:', data);
-      
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('username', username);
-        navigate('/profile');
+      const success = await login(username, password);
+      if (success) {
+        navigate('/');
       } else {
-        throw new Error('No token received in response');
+        setError('Invalid username or password');
       }
     } catch (error) {
-      console.error('Login error details:', error);
-      if (error.message.includes('Failed to fetch')) {
-        setError('Cannot connect to the server. Please check if the server is running and CORS is properly configured.');
+      console.error('Login error:', error);
+      if (error.response?.status === 401) {
+        setError('Invalid username or password');
+      } else if (error.response?.status === 403) {
+        setError('Access denied');
+      } else if (!error.response) {
+        setError('Cannot connect to the server. Please try again later.');
       } else {
-        setError(error.message || 'An error occurred during login. Please try again.');
+        setError(error.response?.data?.message || 'An error occurred during login');
       }
     } finally {
       setIsLoading(false);

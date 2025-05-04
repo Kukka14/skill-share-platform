@@ -9,13 +9,12 @@ import java.util.Date;
 
 @Component
 public class JwtUtil {
-
-    private final String SECRET_KEY = "qbrgavjkoehgid1551185gabgjhaghafio1dsnouf744adefsa4fa4d";
-
-    private final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24 hours
+    private final String SECRET_KEY = "your_jwt_secret_key_should_be_at_least_256_bits_long_for_hs256_algorithm";
+    private final long EXPIRATION_TIME = 864_000_000; // 10 days
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+        byte[] keyBytes = SECRET_KEY.getBytes();
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(String username) {
@@ -23,7 +22,7 @@ public class JwtUtil {
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(getSigningKey())
                 .compact();
     }
 
@@ -38,9 +37,12 @@ public class JwtUtil {
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+            Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token);
             return true;
-        } catch (JwtException e) {
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }

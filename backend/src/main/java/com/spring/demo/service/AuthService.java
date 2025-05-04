@@ -7,23 +7,30 @@ import com.spring.demo.exception.CustomException;
 import com.spring.demo.model.User;
 import com.spring.demo.repository.UserRepository;
 import com.spring.demo.util.JwtUtil;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.spring.demo.service.NotificationService;
 
 @Service
 public class AuthService {
-
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
-
-    
-    //notification object   --->>added by nethmi
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
     private final NotificationService notificationService;
-    
-    public AuthService(UserRepository userRepository, JwtUtil jwtUtil,NotificationService notificationService) {//added by nethmi
+
+    public AuthService(UserRepository userRepository, 
+                      JwtUtil jwtUtil, 
+                      PasswordEncoder passwordEncoder,
+                      AuthenticationManager authenticationManager,
+                      NotificationService notificationService) {
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
-        this.notificationService = notificationService;// added by nethmi
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.notificationService = notificationService;
     }
 
     public User signup(SignupRequest request) {
@@ -38,32 +45,28 @@ public class AuthService {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword()); // plaintext or encoded
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setBio("");
         user.setProfileImageUrl("");
 
-        User savedUser = userRepository.save(user);  //added by nethmi
+        User savedUser = userRepository.save(user);
+        notificationService.createSignupNotification(savedUser.getId(), savedUser.getUsername());
 
-        notificationService.createSignupNotification(savedUser.getId(), savedUser.getUsername()); // added by nethmi
-
-        System.out.println("Saved user ID: " + savedUser.getId());
-        System.out.println("Creating notification...");
-
-
-        return savedUser; // added by nethmi
+        return savedUser;
     }
 
     public JwtResponse login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new CustomException("User not found"));
-
-        if (!user.getPassword().equals(request.getPassword())) {
-            throw new CustomException("Invalid credentials");
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+            );
+            
+            String token = jwtUtil.generateToken(authentication.getName());
+            return new JwtResponse(token);
+        } catch (Exception e) {
+            throw new CustomException("Invalid username or password");
         }
-
-        String token = jwtUtil.generateToken(user.getUsername());
-        return new JwtResponse(token);
     }
 }
