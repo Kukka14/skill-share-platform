@@ -116,12 +116,26 @@ public class PostService {
     }
 
     public Post getPostById(String id) {
-        return postRepository.findById(id)
+        Post post = postRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Post not found with id: " + id));
+        
+        User user = userRepository.findById(post.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        post.setUser(user);
+        
+        return post;
     }
 
     public List<Post> getPostsByUserId(String userId) {
-        return postRepository.findByUserId(userId);
+        List<Post> posts = postRepository.findByUserId(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        posts.forEach(post -> {
+            post.setUser(user);
+        });
+        
+        return posts;
     }
 
     public Post updatePost(String id, String description, List<MultipartFile> mediaFiles) throws IOException {
@@ -206,4 +220,4 @@ public class PostService {
     
     
     
-} 
+}
