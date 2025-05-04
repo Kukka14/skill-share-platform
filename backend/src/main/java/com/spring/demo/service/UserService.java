@@ -6,7 +6,6 @@ import com.spring.demo.util.JwtUtil;
 import com.spring.demo.exception.CustomException;
 import com.spring.demo.dto.UpdateProfileRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +27,11 @@ public class UserService {
     public User getCurrentUser(String token) {
         String username = jwtUtil.extractUsername(token.replace("Bearer ", ""));
         return userRepository.findByUsername(username)
+                .orElseThrow(() -> new CustomException("User not found"));
+    }
+
+    public User getUserById(String userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException("User not found"));
     }
 
@@ -54,6 +58,10 @@ public class UserService {
 
             // Generate unique filename
             String originalFilename = request.getProfileImage().getOriginalFilename();
+            if (originalFilename == null) {
+                throw new CustomException("Invalid file name");
+            }
+            
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             String filename = UUID.randomUUID().toString() + extension;
 
@@ -62,7 +70,7 @@ public class UserService {
             Files.copy(request.getProfileImage().getInputStream(), filePath);
 
             // Update profile image URL
-            user.setProfileImageUrl("http://localhost:8080/uploads/" + filename);
+            user.setProfileImageUrl("/uploads/" + filename);
         }
 
         return userRepository.save(user);
