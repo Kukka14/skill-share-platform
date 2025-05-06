@@ -18,7 +18,17 @@ public class UserController {
 
     @GetMapping("/me")
     public ResponseEntity<User> getCurrentUser(@RequestHeader("Authorization") String token) {
-        return ResponseEntity.ok(userService.getCurrentUser(token));
+        User user = userService.getCurrentUser(token);
+        System.out.println("Current user data: " + user);
+        return ResponseEntity.ok(user);
+    }
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<User> getUserDetails(@PathVariable String userId) {
+        System.out.println("Fetching user details for ID: " + userId);
+        User user = userService.getUserById(userId);
+        System.out.println("Retrieved user data: " + user);
+        return ResponseEntity.ok(user);
     }
 
     @PutMapping("/{userId}/profile")
@@ -29,6 +39,9 @@ public class UserController {
             @RequestParam(value = "bio", required = false) String bio,
             @RequestParam(value = "profileImage", required = false) MultipartFile profileImage) {
         try {
+            System.out.println("Updating profile for user ID: " + userId);
+            System.out.println("Update data - firstName: " + firstName + ", lastName: " + lastName + ", bio: " + bio + ", hasProfileImage: " + (profileImage != null));
+            
             UpdateProfileRequest request = new UpdateProfileRequest();
             request.setFirstName(firstName);
             request.setLastName(lastName);
