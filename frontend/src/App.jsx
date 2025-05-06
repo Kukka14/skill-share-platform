@@ -42,6 +42,16 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+
+           <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationsDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
           <Route 
             path="/profile" 
             element={
