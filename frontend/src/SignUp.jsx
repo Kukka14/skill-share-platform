@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axiosInstance from './utils/axios';
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -14,11 +15,10 @@ export default function SignUp() {
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -27,37 +27,16 @@ export default function SignUp() {
     setIsLoading(true);
 
     try {
-      console.log('Attempting to sign up:', 'http://localhost:8080/api/auth/signup');
-      
-      const response = await fetch('http://localhost:8080/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify(formData)
-      });
-
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error occurred' }));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Signup successful, received data:', data);
-      
-      // Redirect to login page after successful signup
+      await axiosInstance.post('/auth/signup', formData);
       navigate('/login');
     } catch (error) {
-      console.error('Signup error details:', error);
-      if (error.message.includes('Failed to fetch')) {
-        setError('Cannot connect to the server. Please check if the server is running and CORS is properly configured.');
+      console.error('Signup error:', error);
+      if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else if (!error.response) {
+        setError('Cannot connect to the server. Please try again later.');
       } else {
-        setError(error.message || 'An error occurred during signup. Please try again.');
+        setError('An error occurred during signup. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -93,8 +72,19 @@ export default function SignUp() {
             <input
               type="email"
               name="email"
-              placeholder="Email address"
+              placeholder="Email"
               value={formData.email}
+              onChange={handleChange}
+              disabled={isLoading}
+              className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
+              required
+            />
+
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              value={formData.password}
               onChange={handleChange}
               disabled={isLoading}
               className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
@@ -122,17 +112,16 @@ export default function SignUp() {
               className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
               required
             />
+          </div>
 
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              disabled={isLoading}
-              className="w-full rounded-md border border-gray-300 p-2 focus:border-blue-500 focus:outline-none"
-              required
-            />
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Already have an account? Sign in
+            </button>
           </div>
 
           <button
@@ -146,4 +135,4 @@ export default function SignUp() {
       </div>
     </div>
   );
-} 
+}
