@@ -33,18 +33,9 @@ public class NotificationController {
 
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<CollectionModel<EntityModel<Notification>>> getNotificationsByUserId(@PathVariable String userId) {
+    public ResponseEntity<List<Notification>> getNotificationsByUserId(@PathVariable String userId) {
         List<Notification> notifications = notificationService.getNotificationsByUserId(userId);
-
-        List<EntityModel<Notification>> notificationModels = notifications.stream()
-            .map(notification -> EntityModel.of(notification,
-                linkTo(methodOn(NotificationController.class).getNotificationById(notification.getNotificationId())).withSelfRel(),
-                linkTo(methodOn(NotificationController.class).markAsRead(notification.getNotificationId())).withRel("markAsRead"),
-                linkTo(methodOn(NotificationController.class).deleteNotification(notification.getNotificationId())).withRel("delete")
-            ))
-            .toList();
-
-        return ResponseEntity.ok(CollectionModel.of(notificationModels));
+        return ResponseEntity.ok(notifications);
     }
 
 
