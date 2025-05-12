@@ -53,6 +53,9 @@ export default function Profile() {
     }
   }, [userData.id]);
 
+  console.log('User ID:', userData.id);
+  localStorage.setItem('userId', userData.id);
+
   const fetchUserProfile = async () => {
     const token = localStorage.getItem('token');
     if (!token) {

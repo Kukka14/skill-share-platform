@@ -6,6 +6,7 @@ import Login from './Login';
 import SignUp from './SignUp';
 import Home from './Home';
 import Profile from './Profile';
+import NotificationsDashboard from './NotificationsDashboard';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -41,6 +42,16 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+
+           <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationsDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
           <Route 
             path="/profile" 
             element={
