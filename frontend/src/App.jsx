@@ -7,6 +7,7 @@ import SignUp from './SignUp';
 import Home from './Home';
 import Profile from './Profile';
 import NotificationsDashboard from './NotificationsDashboard';
+import LearningPlanPage from './pages/LearningPlanPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -57,6 +58,15 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/learning-plan" 
+            element={
+              <ProtectedRoute>
+                <LearningPlanPage />
               </ProtectedRoute>
             } 
           />
