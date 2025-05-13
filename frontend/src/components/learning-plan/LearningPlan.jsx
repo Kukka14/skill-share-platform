@@ -50,10 +50,39 @@ const LearningPlan = () => {
     setFilteredAllPlans(filterPlans(allPlans));
   }, [searchQuery, plans, allPlans]);
 
+  const fetchPlans = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || !userId) return;
+    setLoading(true);
+    setError('');
+    try {
+      if (tab === 'my') {
+        const res = await fetch(`${BACKEND_URL}/api/learning-plans/user/${userId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch learning plans');
+        const data = await res.json();
+        setPlans(data);
+        setFilteredPlans(data);
+      } else {
+        const res = await fetch(`${BACKEND_URL}/api/learning-plans/public`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch public learning plans');
+        const data = await res.json();
+        setAllPlans(data);
+        setFilteredAllPlans(data);
+      }
+    } catch (err) {
+      setError('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Reset state and fetch data when route changes
   useEffect(() => {
     const resetAndFetchData = async () => {
-      // Reset all state
       setPlans([]);
       setFilteredPlans([]);
       setAllPlans([]);
@@ -63,11 +92,9 @@ const LearningPlan = () => {
       setLoading(true);
       setError('');
       setSearchQuery('');
-
       // Get current user ID
       const token = localStorage.getItem('token');
       if (!token) return;
-
       try {
         const res = await fetch(`${BACKEND_URL}/api/users/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -78,25 +105,7 @@ const LearningPlan = () => {
         setUserId(currentUserId);
         localStorage.setItem('userId', currentUserId);
         setMyUser(data);
-
-        // Fetch plans based on current tab
-        if (tab === 'my') {
-          const plansRes = await fetch(`${BACKEND_URL}/api/learning-plans/user/${currentUserId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (!plansRes.ok) throw new Error('Failed to fetch learning plans');
-          const plansData = await plansRes.json();
-          setPlans(plansData);
-          setFilteredPlans(plansData);
-        } else {
-          const allPlansRes = await fetch(`${BACKEND_URL}/api/learning-plans/public`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (!allPlansRes.ok) throw new Error('Failed to fetch all learning plans');
-          const allPlansData = await allPlansRes.json();
-          setAllPlans(allPlansData);
-          setFilteredAllPlans(allPlansData);
-        }
+        await fetchPlans();
       } catch (err) {
         setError('Failed to load data');
         console.error('Error:', err);
@@ -104,10 +113,7 @@ const LearningPlan = () => {
         setLoading(false);
       }
     };
-
     resetAndFetchData();
-
-    // Cleanup function
     return () => {
       setPlans([]);
       setFilteredPlans([]);
@@ -118,7 +124,7 @@ const LearningPlan = () => {
       setLoading(true);
       setError('');
     };
-  }, [location.pathname, tab]); // Re-run when route or tab changes
+  }, [location.pathname, tab]);
 
   // Fetch user info for all public plans
   useEffect(() => {
@@ -179,7 +185,6 @@ const LearningPlan = () => {
       targetCompletionDate: endDateTime,
       isPublic: newPlan.isPublic,
     };
-    console.log('Submitting new plan:', payload);
     try {
       const res = await fetch(`${BACKEND_URL}/api/learning-plans?creatorId=${userId}`, {
         method: 'POST',
@@ -198,7 +203,7 @@ const LearningPlan = () => {
         goals: [''],
         isPublic: false,
       });
-      fetchPlans();
+      await fetchPlans();
     } catch (err) {
       setError('Failed to create learning plan');
     }
@@ -214,7 +219,7 @@ const LearningPlan = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to delete learning plan');
-      fetchPlans();
+      await fetchPlans();
     } catch (err) {
       setError('Failed to delete learning plan');
     }
@@ -261,7 +266,6 @@ const LearningPlan = () => {
       targetCompletionDate: endDateTime,
       isPublic: editPlan.isPublic,
     };
-    console.log('Submitting edited plan:', payload);
     try {
       const res = await fetch(`${BACKEND_URL}/api/learning-plans/${editPlan.id}`, {
         method: 'PUT',
@@ -274,7 +278,7 @@ const LearningPlan = () => {
       if (!res.ok) throw new Error('Failed to update learning plan');
       setEditModalOpen(false);
       setEditPlan(null);
-      fetchPlans();
+      await fetchPlans();
     } catch (err) {
       setError('Failed to update learning plan');
     }
