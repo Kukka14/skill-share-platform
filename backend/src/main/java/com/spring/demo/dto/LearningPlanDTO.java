@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.hateoas.RepresentationModel;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 public class LearningPlanDTO extends RepresentationModel<LearningPlanDTO> {
@@ -16,6 +17,16 @@ public class LearningPlanDTO extends RepresentationModel<LearningPlanDTO> {
     private LocalDateTime updatedAt;
     private LocalDateTime targetCompletionDate;
     private boolean isPublic;
+    
+    @JsonProperty("isPublic")
+    public boolean isPublic() {
+        return isPublic;
+    }
+
+    @JsonProperty("isPublic")
+    public void setPublic(boolean isPublic) {
+        this.isPublic = isPublic;
+    }
     
     @Data
     public static class TopicDTO {
