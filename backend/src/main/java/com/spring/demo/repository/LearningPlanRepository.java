@@ -11,4 +11,5 @@ public interface LearningPlanRepository extends MongoRepository<LearningPlan, St
     List<LearningPlan> findByCreator(User creator);
     List<LearningPlan> findByIsPublicTrue();
     List<LearningPlan> findByCreatorAndIsPublic(User creator, boolean isPublic);
+    List<LearningPlan> findByCreatorId(String creatorId);
 } 
