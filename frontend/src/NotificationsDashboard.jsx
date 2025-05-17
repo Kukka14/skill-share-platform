@@ -153,15 +153,19 @@ export default function NotificationsDashboard() {
     ) : (
       <ul className="space-y-4">
         {notifications.map((notif) => (
-          <li
-            key={notif.notificationId}
-            className={`p-4 rounded shadow cursor-pointer transition hover:bg-blue-200 ${
-              notif.read ? 'bg-gray-200' : 'bg-blue-100'
-            }`}
-            onClick={() => {
-              if (notif.postId) navigate(`/posts/${notif.postId}`);
-            }}
-          >
+              <li
+              key={notif.notificationId}
+              className={`p-4 rounded shadow cursor-pointer transition hover:bg-blue-200 ${
+                notif.read ? 'bg-gray-200' : 'bg-blue-100'
+              }`}
+              onClick={() => {
+                if (notif.statusId) {
+                  navigate(`/status/${notif.statusId}`);
+                } else if (notif.postId) {
+                  navigate(`/posts/${notif.postId}`);
+                }
+              }}
+    >
             <p className="font-medium">{notif.description}</p>
             <p className="text-sm text-gray-600">
               Status:{' '}

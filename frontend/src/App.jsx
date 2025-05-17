@@ -9,6 +9,7 @@ import Profile from './Profile';
 import NotificationsDashboard from './NotificationsDashboard';
 import LearningPlanPage from './pages/LearningPlanPage';
 import PostViewPage from './PostViewPage';
+import StatusViewPage from './StatusViewPage';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -59,6 +60,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <PostViewPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/status/:statusId" 
+          element={
+            <ProtectedRoute>
+              <StatusViewPage />
             </ProtectedRoute>
           } 
         />
