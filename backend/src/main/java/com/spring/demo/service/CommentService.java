@@ -13,7 +13,6 @@ import com.spring.demo.model.Post;
 import com.spring.demo.repository.NotificationRepository;
 import com.spring.demo.repository.PostRepository;
 
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -34,8 +33,57 @@ public class CommentService {
     @Autowired
     private PostRepository postRepository;
 
+    // Update the createCommentWithUsername method with better logging and error handling
+    public Comment createCommentWithUsername(String username, String postId, String content) {
+        // Input validation
+        if (content == null || content.trim().isEmpty()) {
+            throw new IllegalArgumentException("Comment content cannot be empty");
+        }
 
-    // Create a new comment
+        try {
+            System.out.println("Creating comment with username: " + username + ", postId: " + postId);
+            System.out.println("Comment content: " + content);
+
+            User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+
+            // Check if post exists
+            Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found with id: " + postId));
+
+            Comment comment = new Comment();
+            comment.setUserId(user.getId());
+            comment.setUser(user);
+            comment.setPostId(postId);
+            comment.setContent(content.trim());
+            comment.setCreatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+            comment.setUpdatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+            
+            Comment savedComment = commentRepository.save(comment);
+            System.out.println("Comment saved successfully with id: " + savedComment.getId());
+
+            // Create the notification
+            Notification notification = new Notification();
+            notification.setUserId(user.getId());
+            notification.setUsername(user.getUsername());
+            notification.setPostId(postId);
+            notification.setPostUserId(post.getUserId());
+            notification.setDescription(user.getUsername() + " commented on a post.");
+            notification.setRead(false);
+            notification.setTimestamp(LocalDateTime.now());
+
+            // Save to notifications collection
+            notificationRepository.save(notification);
+
+            return savedComment;
+        } catch (Exception e) {
+            System.err.println("Error creating comment: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    // Create a new comment with userId (keeping existing method for backward compatibility)
     public Comment createComment(String userId, String postId, String content) {
         // Input validation
         if (content == null || content.trim().isEmpty()) {
@@ -73,9 +121,30 @@ public class CommentService {
         notificationRepository.save(notification);
 
         return savedComment;
-        
-        //return commentRepository.save(comment);
+    }
 
+    // Update an existing comment with authentication check
+    public Comment updateCommentWithAuth(String commentId, String content, String username) {
+        // Input validation
+        if (content == null || content.trim().isEmpty()) {
+            throw new IllegalArgumentException("Comment content cannot be empty");
+        }
+
+        Comment comment = commentRepository.findById(commentId)
+            .orElseThrow(() -> new RuntimeException("Comment not found"));
+        
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Check if the user is the owner of the comment
+        if (!comment.getUserId().equals(user.getId())) {
+            throw new SecurityException("You can only edit your own comments");
+        }
+        
+        comment.setContent(content.trim());
+        comment.setUpdatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+        
+        return commentRepository.save(comment);
     }
 
     // Update an existing comment
@@ -92,6 +161,22 @@ public class CommentService {
         comment.setUpdatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
         
         return commentRepository.save(comment);
+    }
+
+    // Delete a comment with authentication check
+    public void deleteCommentWithAuth(String commentId, String username) {
+        Comment comment = commentRepository.findById(commentId)
+            .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+        
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Check if the user is the owner of the comment
+        if (!comment.getUserId().equals(user.getId())) {
+            throw new SecurityException("You can only delete your own comments");
+        }
+        
+        commentRepository.delete(comment);
     }
 
     // Delete a comment
