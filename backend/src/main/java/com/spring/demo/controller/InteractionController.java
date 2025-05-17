@@ -4,7 +4,6 @@ import com.spring.demo.model.Like;
 import com.spring.demo.model.Comment;
 import com.spring.demo.service.LikeService;
 import com.spring.demo.service.CommentService;
-import com.spring.demo.util.JwtUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -16,12 +15,10 @@ public class InteractionController {
 
     private final LikeService likeService;
     private final CommentService commentService;
-    private final JwtUtil jwtUtil;
 
-    public InteractionController(LikeService likeService, CommentService commentService, JwtUtil jwtUtil) {
+    public InteractionController(LikeService likeService, CommentService commentService) {
         this.likeService = likeService;
         this.commentService = commentService;
-        this.jwtUtil = jwtUtil;
     }
 
     // Like endpoints
@@ -63,52 +60,35 @@ public class InteractionController {
     @PostMapping("/posts/{postId}/comments")
     public ResponseEntity<?> createComment(
             @PathVariable String postId,
-            @RequestHeader("Authorization") String token,
-            @RequestBody CommentRequest commentRequest) {
+            @RequestParam String userId,
+            @RequestBody String content) {
         try {
-            String username = jwtUtil.extractUsername(token.replace("Bearer ", ""));
-            System.out.println("Creating comment for post: " + postId + " by user: " + username);
-            System.out.println("Comment content: " + commentRequest.getContent());
-            
-            Comment comment = commentService.createCommentWithUsername(username, postId, commentRequest.getContent());
+            Comment comment = commentService.createComment(userId, postId, content);
             return ResponseEntity.ok(comment);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(new ErrorResponse("An error occurred: " + e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     @PutMapping("/comments/{commentId}")
     public ResponseEntity<?> updateComment(
             @PathVariable String commentId,
-            @RequestHeader("Authorization") String token,
-            @RequestBody CommentRequest commentRequest) {
+            @RequestBody String content) {
         try {
-            String username = jwtUtil.extractUsername(token.replace("Bearer ", ""));
-            Comment updated = commentService.updateCommentWithAuth(commentId, commentRequest.getContent(), username);
+            Comment updated = commentService.updateComment(commentId, content);
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
-        } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(new ErrorResponse(e.getMessage()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(new ErrorResponse("An error occurred: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     @DeleteMapping("/comments/{commentId}")
-    public ResponseEntity<?> deleteComment(
-            @PathVariable String commentId,
-            @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> deleteComment(@PathVariable String commentId) {
         try {
-            String username = jwtUtil.extractUsername(token.replace("Bearer ", ""));
-            commentService.deleteCommentWithAuth(commentId, username);
-            return ResponseEntity.ok().body("Comment deleted successfully");
+            commentService.deleteComment(commentId);
+            return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
-        } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(e.getMessage());
         }
     }
 
