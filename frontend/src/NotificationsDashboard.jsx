@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 
 export default function NotificationsDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState({ id: '' });
+  const navigate = useNavigate();
+
 
   const token = localStorage.getItem('token');
 
@@ -142,78 +146,90 @@ export default function NotificationsDashboard() {
   if (error) return <p className="text-red-500">{error}</p>;
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Notifications</h2>
-      {notifications.length === 0 ? (
-        <p>No notifications found.</p>
-      ) : (
-        <ul className="space-y-4">
-          {notifications.map((notif) => (
-            <li
-              key={notif.notificationId}
-              className={`p-4 rounded shadow ${notif.read ? 'bg-gray-200' : 'bg-blue-100'}`}
-            >
-              <p className="font-medium">{notif.description}</p>
-              <p className="text-sm text-gray-600">
-                Status:{' '}
-                <span className={notif.read ? 'text-green-600' : 'text-red-600'}>
-                  {notif.read ? 'Read' : 'Not Read'}
-                </span>
-              </p>
-              <p className="text-xs text-gray-500">
-                Time: {new Date(notif.timestamp).toLocaleString()}
-              </p>
+  <div className="p-4">
+    <h2 className="text-xl font-bold mb-4">Notifications</h2>
+    {notifications.length === 0 ? (
+      <p>No notifications found.</p>
+    ) : (
+      <ul className="space-y-4">
+        {notifications.map((notif) => (
+          <li
+            key={notif.notificationId}
+            className={`p-4 rounded shadow cursor-pointer transition hover:bg-blue-200 ${
+              notif.read ? 'bg-gray-200' : 'bg-blue-100'
+            }`}
+            onClick={() => {
+              if (notif.postId) navigate(`/posts/${notif.postId}`);
+            }}
+          >
+            <p className="font-medium">{notif.description}</p>
+            <p className="text-sm text-gray-600">
+              Status:{' '}
+              <span className={notif.read ? 'text-green-600' : 'text-red-600'}>
+                {notif.read ? 'Read' : 'Not Read'}
+              </span>
+            </p>
+            <p className="text-xs text-gray-500">
+              Time: {new Date(notif.timestamp).toLocaleString()}
+            </p>
 
-              {/* 🎥 Post Media Display */}
-              {notif.post?.mediaUrls?.length > 0 && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {notif.post.mediaUrls.map((url, idx) => {
-                    const type = notif.post.mediaTypes?.[idx] || '';
-                    const fullUrl = `http://localhost:8080${url}`;
+            {/* 🎥 Post Media Display */}
+            {notif.post?.mediaUrls?.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {notif.post.mediaUrls.map((url, idx) => {
+                  const type = notif.post.mediaTypes?.[idx] || '';
+                  const fullUrl = `http://localhost:8080${url}`;
 
-                    return type.startsWith('image/') ? (
-                      <img
-                        key={idx}
-                        src={fullUrl}
-                        alt="Post Media"
-                        className="w-full h-32 object-cover rounded"
-                      />
-                    ) : type.startsWith('video/') ? (
-                      <video
-                        key={idx}
-                        src={fullUrl}
-                        controls
-                        className="w-full h-32 object-cover rounded"
-                      />
-                    ) : null;
-                  })}
-                </div>
-              )}
-
-              <div className="mt-2 flex space-x-2">
-                <button
-                  onClick={() => markAsRead(notif.notificationId)}
-                  disabled={notif.read}
-                  className={`px-3 py-1 rounded text-white ${
-                    notif.read
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  Mark as Read
-                </button>
-
-                <button
-                  onClick={() => deleteNotification(notif.notificationId)}
-                  className="px-3 py-1 rounded text-white bg-red-600 hover:bg-red-700"
-                >
-                  Delete
-                </button>
+                  return type.startsWith('image/') ? (
+                    <img
+                      key={idx}
+                      src={fullUrl}
+                      alt="Post Media"
+                      className="w-full h-32 object-cover rounded"
+                    />
+                  ) : type.startsWith('video/') ? (
+                    <video
+                      key={idx}
+                      src={fullUrl}
+                      controls
+                      className="w-full h-32 object-cover rounded"
+                    />
+                  ) : null;
+                })}
               </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+            )}
+
+            <div className="mt-2 flex space-x-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markAsRead(notif.notificationId);
+                }}
+                disabled={notif.read}
+                className={`px-3 py-1 rounded text-white ${
+                  notif.read
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                Mark as Read
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteNotification(notif.notificationId);
+                }}
+                className="px-3 py-1 rounded text-white bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+);
+
 }
