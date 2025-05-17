@@ -18,6 +18,14 @@ export default function Home() {
     }
   }, [posts]);
 
+  //added by nethmi 
+  useEffect(() => {
+  if (postsWithUserData.length > 0 && postsWithUserData[0].userData?.id) {
+    console.log('User ID:', postsWithUserData[0].userData.id);
+    localStorage.setItem('userId', postsWithUserData[0].userData.id);
+  }
+}, [postsWithUserData]);
+
   const fetchPosts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
