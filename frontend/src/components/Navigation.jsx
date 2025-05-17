@@ -25,7 +25,7 @@ export default function Navigation() {
     <nav className="bg-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16">
-          <div className="flex">
+          <div className="flex space-x-4">
             <Link to="/" className="flex items-center px-2 py-2 text-gray-700 hover:text-gray-900">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -33,6 +33,17 @@ export default function Navigation() {
               </svg>
               <span className="ml-2 font-medium">Home</span>
             </Link>
+            {user && (
+              <Link
+                to="/learning-plan"
+                className="flex items-center px-2 py-2 text-gray-700 hover:text-gray-900"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span className="ml-2 font-medium">Learning Plan</span>
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center space-x-4">

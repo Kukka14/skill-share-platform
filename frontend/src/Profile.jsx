@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import LearningPlan from './components/learning-plan/LearningPlan';
 
 export default function Profile() {
   const [userData, setUserData] = useState({
@@ -39,6 +40,7 @@ export default function Profile() {
   const [newPostDescription, setNewPostDescription] = useState('');
   const [newPostMedia, setNewPostMedia] = useState([]);
   const [newPostMediaPreviews, setNewPostMediaPreviews] = useState([]);
+  const [isLearningPlanModalOpen, setIsLearningPlanModalOpen] = useState(false);
   const navigate = useNavigate();
   const BACKEND_URL = 'http://localhost:8080';
 
@@ -1026,15 +1028,17 @@ export default function Profile() {
           <div className="px-4 py-5 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-gray-900">My Posts</h2>
-              <button
-                onClick={() => setIsPostModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Post
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setIsPostModalOpen(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Post
+                </button>
+              </div>
             </div>
             <div className="space-y-6 max-h-[600px] overflow-y-auto">
               {posts.map((post) => (

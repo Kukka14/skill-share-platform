@@ -36,6 +36,7 @@ public class LearningPlanService {
         learningPlan.setTitle(learningPlanDTO.getTitle());
         learningPlan.setDescription(learningPlanDTO.getDescription());
         learningPlan.setCreator(creator);
+        learningPlan.setCreatorId(creatorId);
         learningPlan.setCreatedAt(LocalDateTime.now());
         learningPlan.setUpdatedAt(LocalDateTime.now());
         learningPlan.setTargetCompletionDate(learningPlanDTO.getTargetCompletionDate());
@@ -124,7 +125,7 @@ public class LearningPlanService {
     public List<LearningPlanDTO> getUserLearningPlans(String userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
-        return learningPlanRepository.findByCreator(user).stream()
+        return learningPlanRepository.findByCreatorId(userId).stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
