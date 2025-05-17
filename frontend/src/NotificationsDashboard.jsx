@@ -4,26 +4,63 @@ export default function NotificationsDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState({ id: '' });
 
   const token = localStorage.getItem('token');
-  const userId = localStorage.getItem('userId');
 
+  // 1️⃣ Fetch user data
   useEffect(() => {
-    if (!token || !userId) {
-      setError('You must be logged in to view notifications.');
-      setLoading(false);
-      return;
-    }
+    const fetchUserProfile = async () => {
+      if (!token) {
+        setError('Unauthorized. Please log in.');
+        setLoading(false);
+        return;
+      }
 
-    const fetchNotifications = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/api/notifications/user/${userId}`, {
+        const res = await fetch('http://localhost:8080/api/users/me', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        if (!response.ok) throw new Error('Failed to fetch notifications');
+        if (!res.ok) throw new Error('Failed to fetch user');
+
+        const data = await res.json();
+        setUserData(data);
+      } catch (err) {
+        setError(err.message || 'Error fetching user');
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [token]);
+
+  // 2️⃣ Save userId to localStorage
+  useEffect(() => {
+    if (userData.id) {
+      console.log('User ID:', userData.id);
+      localStorage.setItem('userId', userData.id);
+    }
+  }, [userData.id]);
+
+  // 3️⃣ Fetch notifications *after* userId is available
+  useEffect(() => {
+    if (!token || !userData.id) return;
+
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch(`http://localhost:8080/api/notifications/user/${userData.id}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Failed to fetch notifications');
+        }
 
         const data = await response.json();
         const sortedData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -36,7 +73,7 @@ export default function NotificationsDashboard() {
     };
 
     fetchNotifications();
-  }, [token, userId]);
+  }, [token, userData.id]);
 
   const markAsRead = async (notificationId) => {
     try {
@@ -91,9 +128,7 @@ export default function NotificationsDashboard() {
           {notifications.map((notif) => (
             <li
               key={notif.notificationId}
-              className={`p-4 rounded shadow ${
-                notif.read ? 'bg-gray-200' : 'bg-blue-100'
-              }`}
+              className={`p-4 rounded shadow ${notif.read ? 'bg-gray-200' : 'bg-blue-100'}`}
             >
               <p className="font-medium">{notif.description}</p>
               <p className="text-sm text-gray-600">
@@ -111,7 +146,9 @@ export default function NotificationsDashboard() {
                   onClick={() => markAsRead(notif.notificationId)}
                   disabled={notif.read}
                   className={`px-3 py-1 rounded text-white ${
-                    notif.read ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                    notif.read
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700'
                   }`}
                 >
                   Mark as Read
