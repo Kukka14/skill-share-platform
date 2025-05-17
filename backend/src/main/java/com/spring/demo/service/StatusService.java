@@ -75,16 +75,19 @@ public class StatusService {
         // added by nethmi 
         Status savedStatus = statusRepository.save(status);
 
-            // ✅ Create a notification
-            Notification notification = new Notification();
-            notification.setUserId(user.getId());
-            notification.setUsername(user.getUsername());
-            notification.setDescription(user.getUsername() + " created a new status.");
-            notification.setRead(false);
-            notification.setTimestamp(LocalDateTime.now());
+            // ✅ Create a notification when status is created
+Notification notification = new Notification();
+notification.setUserId(user.getId());
+notification.setUsername(user.getUsername());
+notification.setDescription(user.getUsername() + " created a new status.");
+notification.setStatusId(savedStatus.getId()); // ✅ set statusId
+notification.setStatusUserId(user.getId());    // ✅ set statusUserId (same as user.getId())
+notification.setRead(false);
+notification.setTimestamp(LocalDateTime.now());
 
-            // Save the notification
-            notificationRepository.save(notification);
+// Save the notification
+notificationRepository.save(notification);
+
 
             return savedStatus;
 
