@@ -20,6 +20,8 @@ public class Notification {
     private String username;
     private String postId;
     private String postUserId;
+    private String statusId;
+    private String statusUserId;
     private String description;
      @JsonProperty("read")
 
@@ -90,6 +92,22 @@ public class Notification {
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
     }
+    public String getStatusId() {
+    return statusId;
+}
+
+public void setStatusId(String statusId) {
+    this.statusId = statusId;
+}
+
+public String getStatusUserId() {
+    return statusUserId;
+}
+
+public void setStatusUserId(String statusUserId) {
+    this.statusUserId = statusUserId;
+}
+
     
 
 }

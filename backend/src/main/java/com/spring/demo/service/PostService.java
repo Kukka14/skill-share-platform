@@ -96,17 +96,20 @@ public class PostService {
         User user = userRepository.findById(userId)
         .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Create and save notification in notifications collection        added by nethmi
-        Notification notification = new Notification();
-        notification.setUserId(userId);
-        notification.setUsername(user.getUsername());
-        notification.setDescription(user.getUsername() + " added a new post.");
-        notification.setRead(false);
-        notification.setTimestamp(LocalDateTime.now());
+        // Create and save notification in notifications collection
+Notification notification = new Notification();
+notification.setUserId(userId);
+notification.setUsername(user.getUsername());
+notification.setPostId(savedPost.getId());  // ✅ this adds the postId to the notification
+notification.setPostUserId(userId);         // ✅ optional, for future filtering
+notification.setDescription(user.getUsername() + " added a new post.");
+notification.setRead(false);
+notification.setTimestamp(LocalDateTime.now());
 
-         notificationRepository.save(notification);
+notificationRepository.save(notification);
 
-         return savedPost;   // added by nethmi
+return savedPost;
+
         
 
     }
