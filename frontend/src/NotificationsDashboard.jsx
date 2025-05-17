@@ -145,18 +145,20 @@ export default function NotificationsDashboard() {
   if (loading) return <p>Loading notifications...</p>;
   if (error) return <p className="text-red-500">{error}</p>;
 
-  return (
-  <div className="p-4">
-    <h2 className="text-xl font-bold mb-4">Notifications</h2>
-    {notifications.length === 0 ? (
-      <p>No notifications found.</p>
-    ) : (
-      <ul className="space-y-4">
-        {notifications.map((notif) => (
-              <li
+ return (
+  <div className="min-h-screen bg-gray-50 py-10 px-6 md:px-20">
+    <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl p-6">
+      <h2 className="text-2xl font-semibold text-black-800 mb-6 border-b pb-3"><b > Notifications</b></h2>
+
+      {notifications.length === 0 ? (
+        <p className="text-gray-600">No notifications found.</p>
+      ) : (
+        <ul className="space-y-6">
+          {notifications.map((notif) => (
+            <li
               key={notif.notificationId}
-              className={`p-4 rounded shadow cursor-pointer transition hover:bg-blue-200 ${
-                notif.read ? 'bg-gray-200' : 'bg-blue-100'
+              className={`p-5 rounded-xl shadow-md border transition-all duration-200 cursor-pointer ${
+                notif.read ? 'bg-gray-100 hover:bg-gray-200' : 'bg-blue-50 hover:bg-blue-100'
               }`}
               onClick={() => {
                 if (notif.statusId) {
@@ -165,74 +167,74 @@ export default function NotificationsDashboard() {
                   navigate(`/posts/${notif.postId}`);
                 }
               }}
-    >
-            <p className="font-medium">{notif.description}</p>
-            <p className="text-sm text-gray-600">
-              Status:{' '}
-              <span className={notif.read ? 'text-green-600' : 'text-red-600'}>
-                {notif.read ? 'Read' : 'Not Read'}
-              </span>
-            </p>
-            <p className="text-xs text-gray-500">
-              Time: {new Date(notif.timestamp).toLocaleString()}
-            </p>
+            >
+              <p className="font-semibold text-gray-800">{notif.description}</p>
+              <p className="text-sm mt-1">
+                Status:{' '}
+                <span className={notif.read ? 'text-green-600' : 'text-red-500 font-semibold'}>
+                  {notif.read ? 'Read' : 'Not Read'}
+                </span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Time: {new Date(notif.timestamp).toLocaleString()}
+              </p>
 
-            {/* 🎥 Post Media Display */}
-            {notif.post?.mediaUrls?.length > 0 && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {notif.post.mediaUrls.map((url, idx) => {
-                  const type = notif.post.mediaTypes?.[idx] || '';
-                  const fullUrl = `http://localhost:8080${url}`;
+              {/* Post Media */}
+              {notif.post?.mediaUrls?.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  {notif.post.mediaUrls.map((url, idx) => {
+                    const type = notif.post.mediaTypes?.[idx] || '';
+                    const fullUrl = `http://localhost:8080${url}`;
+                    return type.startsWith('image/') ? (
+                      <img
+                        key={idx}
+                        src={fullUrl}
+                        alt="Post Media"
+                        className="rounded-xl object-cover w-full h-40"
+                      />
+                    ) : type.startsWith('video/') ? (
+                      <video
+                        key={idx}
+                        src={fullUrl}
+                        controls
+                        className="rounded-xl object-cover w-full h-40"
+                      />
+                    ) : null;
+                  })}
+                </div>
+              )}
 
-                  return type.startsWith('image/') ? (
-                    <img
-                      key={idx}
-                      src={fullUrl}
-                      alt="Post Media"
-                      className="w-full h-32 object-cover rounded"
-                    />
-                  ) : type.startsWith('video/') ? (
-                    <video
-                      key={idx}
-                      src={fullUrl}
-                      controls
-                      className="w-full h-32 object-cover rounded"
-                    />
-                  ) : null;
-                })}
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markAsRead(notif.notificationId);
+                  }}
+                  disabled={notif.read}
+                  className={`px-4 py-1.5 rounded-lg text-white text-sm font-medium ${
+                    notif.read
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-green-700'
+                  }`}
+                >
+                  Mark as Read
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteNotification(notif.notificationId);
+                  }}
+                  className="px-4 py-1.5 rounded-lg text-white text-sm font-medium bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </button>
               </div>
-            )}
-
-            <div className="mt-2 flex space-x-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  markAsRead(notif.notificationId);
-                }}
-                disabled={notif.read}
-                className={`px-3 py-1 rounded text-white ${
-                  notif.read
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700'
-                }`}
-              >
-                Mark as Read
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteNotification(notif.notificationId);
-                }}
-                className="px-3 py-1 rounded text-white bg-red-600 hover:bg-red-700"
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   </div>
 );
 
