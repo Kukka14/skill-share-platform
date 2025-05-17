@@ -3,141 +3,168 @@ import React, { useEffect, useState } from 'react';
 export default function NotificationsDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState({ id: '' });
 
+  const token = localStorage.getItem('token');
+
+  // 1️⃣ Fetch user data
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userId = localStorage.getItem('userId');
+    const fetchUserProfile = async () => {
+      if (!token) {
+        setError('Unauthorized. Please log in.');
+        setLoading(false);
+        return;
+      }
 
-    if (!token || !userId) {
-      setError('You must be logged in to view notifications.');
-      setIsLoading(false);
-      return;
+      try {
+        const res = await fetch('http://localhost:8080/api/users/me', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch user');
+
+        const data = await res.json();
+        setUserData(data);
+      } catch (err) {
+        setError(err.message || 'Error fetching user');
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [token]);
+
+  // 2️⃣ Save userId to localStorage
+  useEffect(() => {
+    if (userData.id) {
+      console.log('User ID:', userData.id);
+      localStorage.setItem('userId', userData.id);
     }
+  }, [userData.id]);
+
+  // 3️⃣ Fetch notifications *after* userId is available
+  useEffect(() => {
+    if (!token || !userData.id) return;
 
     const fetchNotifications = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/api/notifications/user/${userId}`, {
-          method: 'GET',
+        const response = await fetch(`http://localhost:8080/api/notifications/user/${userData.id}`, {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`, // Add the JWT token here
+            Authorization: `Bearer ${token}`,
           },
         });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch notifications');
+          const errorText = await response.text();
+          throw new Error(errorText || 'Failed to fetch notifications');
         }
 
         const data = await response.json();
-        console.log('Fetched notifications:', data);
-        setNotifications(data || []);
-      } catch (error) {
-        setError(error.message || 'Error fetching notifications');
+        const sortedData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setNotifications(sortedData);
+      } catch (err) {
+        setError(err.message || 'Error loading notifications');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
     fetchNotifications();
-  }, []);
+  }, [token, userData.id]);
 
-  const handleMarkAsRead = async (notificationId) => {
-    const token = localStorage.getItem('token');
-  
+  const markAsRead = async (notificationId) => {
     try {
       const response = await fetch(`http://localhost:8080/api/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
-  
-      if (!response.ok) {
-        throw new Error('Failed to mark notification as read');
-      }
-  
-      // Update state locally
+
+      if (!response.ok) throw new Error('Failed to mark as read');
+
       setNotifications((prev) =>
-        prev.map((n) =>
-          n.notificationId === notificationId ? { ...n, isRead: true } : n
+        prev.map((notif) =>
+          notif.notificationId === notificationId ? { ...notif, read: true } : notif
         )
       );
-    } catch (error) {
-      console.error(error);
-      setError(error.message || 'Error marking notification as read');
+    } catch (err) {
+      alert('Error updating notification: ' + err.message);
     }
   };
-  const handleDelete = async (notificationId) => {
-    const token = localStorage.getItem('token'); // Get token from localStorage
 
+  const deleteNotification = async (notificationId) => {
     try {
       const response = await fetch(`http://localhost:8080/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`, // Add the JWT token here
+          Authorization: `Bearer ${token}`,
         },
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to delete notification');
-      }
+      if (!response.ok) throw new Error('Failed to delete notification');
 
-      // Update state locally without refetching
       setNotifications((prev) =>
-        prev.filter((n) => n.notificationId !== notificationId)
+        prev.filter((notif) => notif.notificationId !== notificationId)
       );
-    } catch (error) {
-      console.error(error);
-      setError(error.message || 'Error deleting notification');
+    } catch (err) {
+      alert('Error deleting notification: ' + err.message);
     }
   };
 
-  if (isLoading) return <p>Loading notifications...</p>;
-  if (error) return <p>{error}</p>;
+  if (loading) return <p>Loading notifications...</p>;
+  if (error) return <p className="text-red-500">{error}</p>;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="w-full max-w-3xl space-y-8 rounded-lg bg-white p-8 shadow-md">
-        <h2 className="text-center text-2xl font-bold text-gray-900">Your Notifications</h2>
+    <div className="p-4">
+      <h2 className="text-xl font-bold mb-4">Notifications</h2>
+      {notifications.length === 0 ? (
+        <p>No notifications found.</p>
+      ) : (
+        <ul className="space-y-4">
+          {notifications.map((notif) => (
+            <li
+              key={notif.notificationId}
+              className={`p-4 rounded shadow ${notif.read ? 'bg-gray-200' : 'bg-blue-100'}`}
+            >
+              <p className="font-medium">{notif.description}</p>
+              <p className="text-sm text-gray-600">
+                Status:{' '}
+                <span className={notif.read ? 'text-green-600' : 'text-red-600'}>
+                  {notif.read ? 'Read' : 'Not Read'}
+                </span>
+              </p>
+              <p className="text-xs text-gray-500">
+                Time: {new Date(notif.timestamp).toLocaleString()}
+              </p>
 
-        {notifications.length === 0 ? (
-          <p className="text-center text-gray-600">No notifications found.</p>
-        ) : (
-          <ul className="space-y-6">
-            {notifications.map((notification) => (
-              <li
-                key={notification.notificationId}
-                className="rounded-md border border-gray-200 p-4 shadow-sm hover:shadow-md transition duration-300"
-              >
-                <p className="mb-2"><span className="font-semibold">Description:</span> {notification.description}</p>
-                <p className="mb-2"><span className="font-semibold">From User:</span> {notification.username}</p>
-                <p className="mb-2"><span className="font-semibold">Time:</span> {new Date(notification.timestamp).toLocaleString()}</p>
-                <p className="mb-4"><span className="font-semibold">Status:</span> {notification.isRead ? 'Read' : 'Unread'}</p>
+              <div className="mt-2 flex space-x-2">
+                <button
+                  onClick={() => markAsRead(notif.notificationId)}
+                  disabled={notif.read}
+                  className={`px-3 py-1 rounded text-white ${
+                    notif.read
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700'
+                  }`}
+                >
+                  Mark as Read
+                </button>
 
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => handleMarkAsRead(notification.notificationId)}
-                    disabled={notification.isRead}
-                    className={`rounded-md px-4 py-2 text-white ${
-                      notification.isRead ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
-                  >
-                    {notification.isRead ? 'Already Read' : 'Mark as Read'}
-                  </button>
-
-                  <button
-                    onClick={() => handleDelete(notification.notificationId)}
-                    className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                <button
+                  onClick={() => deleteNotification(notif.notificationId)}
+                  className="px-3 py-1 rounded text-white bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

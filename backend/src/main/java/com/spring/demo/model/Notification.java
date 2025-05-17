@@ -7,6 +7,8 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -19,6 +21,8 @@ public class Notification {
     private String postId;
     private String postUserId;
     private String description;
+     @JsonProperty("read")
+
     private boolean isRead;
     private LocalDateTime timestamp;
 
