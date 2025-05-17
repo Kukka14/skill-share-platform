@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 
 export default function NotificationsDashboard() {
@@ -46,7 +45,7 @@ export default function NotificationsDashboard() {
     }
   }, [userData.id]);
 
-  // 3️⃣ Fetch notifications *after* userId is available
+  // 3️⃣ Fetch notifications and their related posts
   useEffect(() => {
     if (!token || !userData.id) return;
 
@@ -65,7 +64,30 @@ export default function NotificationsDashboard() {
 
         const data = await response.json();
         const sortedData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setNotifications(sortedData);
+
+        // Fetch post data for each notification
+        const notificationsWithPosts = await Promise.all(
+          sortedData.map(async (notif) => {
+            if (!notif.postId) return notif;
+
+            try {
+              const postRes = await fetch(`http://localhost:8080/api/posts/${notif.postId}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (!postRes.ok) throw new Error('Failed to fetch post');
+              const postData = await postRes.json();
+              return { ...notif, post: postData };
+            } catch (error) {
+              console.error(`Error fetching post for notification ${notif.notificationId}:`, error);
+              return notif;
+            }
+          })
+        );
+
+        setNotifications(notificationsWithPosts);
       } catch (err) {
         setError(err.message || 'Error loading notifications');
       } finally {
@@ -141,6 +163,32 @@ export default function NotificationsDashboard() {
               <p className="text-xs text-gray-500">
                 Time: {new Date(notif.timestamp).toLocaleString()}
               </p>
+
+              {/* 🎥 Post Media Display */}
+              {notif.post?.mediaUrls?.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {notif.post.mediaUrls.map((url, idx) => {
+                    const type = notif.post.mediaTypes?.[idx] || '';
+                    const fullUrl = `http://localhost:8080${url}`;
+
+                    return type.startsWith('image/') ? (
+                      <img
+                        key={idx}
+                        src={fullUrl}
+                        alt="Post Media"
+                        className="w-full h-32 object-cover rounded"
+                      />
+                    ) : type.startsWith('video/') ? (
+                      <video
+                        key={idx}
+                        src={fullUrl}
+                        controls
+                        className="w-full h-32 object-cover rounded"
+                      />
+                    ) : null;
+                  })}
+                </div>
+              )}
 
               <div className="mt-2 flex space-x-2">
                 <button
