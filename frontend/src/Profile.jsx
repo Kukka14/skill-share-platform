@@ -41,6 +41,8 @@ export default function Profile() {
   const [newPostMedia, setNewPostMedia] = useState([]);
   const [newPostMediaPreviews, setNewPostMediaPreviews] = useState([]);
   const [isLearningPlanModalOpen, setIsLearningPlanModalOpen] = useState(false);
+  const [likedPosts, setLikedPosts] = useState({});
+  const [likeCounts, setLikeCounts] = useState({});
   const navigate = useNavigate();
   const BACKEND_URL = 'http://localhost:8080';
 
@@ -54,6 +56,12 @@ export default function Profile() {
       fetchUserPosts();
     }
   }, [userData.id]);
+
+  useEffect(() => {
+    if (posts.length > 0 && userData.id) {
+      fetchLikeStatus();
+    }
+  }, [posts, userData.id]);
 
   console.log('User ID:', userData.id);
   localStorage.setItem('userId', userData.id);
@@ -163,6 +171,98 @@ export default function Profile() {
     } catch (error) {
       console.error('Posts fetch error:', error);
       setError('Failed to load posts: ' + error.message);
+    }
+  };
+
+  const fetchLikeStatus = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || !userData.id) return;
+    
+    try {
+      console.log('Fetching like status for user posts');
+      
+      const newLikedPosts = {};
+      const newLikeCounts = {};
+      
+      await Promise.all(posts.map(async (post) => {
+        try {
+          // Fetch like count
+          const countResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes/count`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (countResponse.ok) {
+            const count = await countResponse.json();
+            newLikeCounts[post.id] = count;
+          }
+          
+          // Check if user has liked post
+          const likesResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (likesResponse.ok) {
+            const likes = await likesResponse.json();
+            const userLiked = Array.isArray(likes) && likes.some(like => like.userId === userData.id);
+            newLikedPosts[post.id] = userLiked;
+          }
+        } catch (error) {
+          console.error(`Error fetching like data for post ${post.id}:`, error);
+        }
+      }));
+      
+      setLikedPosts(newLikedPosts);
+      setLikeCounts(newLikeCounts);
+    } catch (error) {
+      console.error('Error fetching like status:', error);
+    }
+  };
+
+  const handleLike = async (postId) => {
+    const token = localStorage.getItem('token');
+    if (!token || !userData.id) {
+      console.log('Cannot like: no token or userId available');
+      return;
+    }
+    
+    try {
+      if (likedPosts[postId]) {
+        // Unlike post
+        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${userData.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          setLikedPosts(prev => ({ ...prev, [postId]: false }));
+          setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 1) - 1) }));
+        } else {
+          console.error('Error unliking post:', await response.text());
+        }
+      } else {
+        // Like post
+        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${userData.id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          setLikedPosts(prev => ({ ...prev, [postId]: true }));
+          setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+        } else {
+          console.error('Error liking post:', await response.text());
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
     }
   };
 
@@ -1115,11 +1215,14 @@ export default function Profile() {
                   <div className="p-4 border-t">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <button className="flex items-center text-gray-500 hover:text-blue-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <button 
+                          onClick={() => handleLike(post.id)}
+                          className={`flex items-center ${likedPosts[post.id] ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill={likedPosts[post.id] ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
-                          Like
+                          Like {likeCounts[post.id] > 0 && `(${likeCounts[post.id]})`}
                         </button>
                         <button className="flex items-center text-gray-500 hover:text-blue-600">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

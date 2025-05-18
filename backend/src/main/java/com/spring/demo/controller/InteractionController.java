@@ -10,7 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/interactions")
-@CrossOrigin(origins = "*")
+
 public class InteractionController {
 
     private final LikeService likeService;
@@ -27,10 +27,16 @@ public class InteractionController {
             @PathVariable String postId,
             @RequestParam String userId) {
         try {
+            System.out.println("Attempting to like post: " + postId + " by user: " + userId);
             Like like = likeService.createLike(userId, postId);
             return ResponseEntity.ok(like);
         } catch (IllegalArgumentException e) {
+            System.err.println("IllegalArgumentException in likePost: " + e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Exception in likePost: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error liking post: " + e.getMessage());
         }
     }
 
@@ -39,10 +45,16 @@ public class InteractionController {
             @PathVariable String postId,
             @RequestParam String userId) {
         try {
+            System.out.println("Attempting to unlike post: " + postId + " by user: " + userId);
             likeService.removeLike(userId, postId);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
+            System.err.println("IllegalArgumentException in unlikePost: " + e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Exception in unlikePost: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error unliking post: " + e.getMessage());
         }
     }
 
@@ -63,10 +75,29 @@ public class InteractionController {
             @RequestParam String userId,
             @RequestBody String content) {
         try {
-            Comment comment = commentService.createComment(userId, postId, content);
+            System.out.println("Creating comment for post: " + postId + " by user: " + userId);
+            System.out.println("Raw content: " + content);
+            
+            // Clean up the content string which might have quotes from JSON
+            String cleanContent = content;
+            if (content.startsWith("\"") && content.endsWith("\"")) {
+                cleanContent = content.substring(1, content.length() - 1);
+            }
+            
+            // Handle escaped quotes that might come from JSON parsing
+            cleanContent = cleanContent.replace("\\\"", "\"");
+            
+            System.out.println("Cleaned content: " + cleanContent);
+            
+            Comment comment = commentService.createComment(userId, postId, cleanContent);
             return ResponseEntity.ok(comment);
         } catch (IllegalArgumentException e) {
+            System.err.println("IllegalArgumentException in createComment: " + e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Exception in createComment: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error creating comment: " + e.getMessage());
         }
     }
 
