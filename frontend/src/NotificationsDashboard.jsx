@@ -189,7 +189,7 @@ export default function NotificationsDashboard() {
                 }}
                 disabled={notif.read}
                 className={`px-4 py-1.5 rounded-lg text-white text-sm font-medium ${
-                  notif.read ? 'bg-gray-400' : 'bg-blue-600 hover:bg-green-700'
+                  notif.read ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
                 }`}
               >
                 Mark as Read
