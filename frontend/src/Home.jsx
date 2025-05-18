@@ -18,6 +18,11 @@ export default function Home() {
   const [commentCounts, setCommentCounts] = useState({});
   const [newComment, setNewComment] = useState({});
   const [showComments, setShowComments] = useState({});
+  
+
+  const [userData, setUserData] = useState({ id: '' });
+  const token = localStorage.getItem('token'); // ✅ Add this line
+
 
   const getCurrentUserId = () => {
     if (user?.id) return user.id;
@@ -27,6 +32,39 @@ export default function Home() {
     console.error('Could not determine current user ID', user);
     return null;
   };
+  
+
+  useEffect(() => {
+  const fetchUserProfile = async () => {
+    if (!token) {
+      setError('Unauthorized. Please log in.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('http://localhost:8080/api/users/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch user');
+      const data = await res.json();
+      setUserData(data); // 👈 This triggers the next effect
+    } catch (err) {
+      setError(err.message || 'Error fetching user');
+      setLoading(false);
+    }
+  };
+
+  fetchUserProfile();
+}, [token]);
+
+useEffect(() => {
+  if (userData.id) localStorage.setItem('userId', userData.id);
+}, [userData.id]);
+
+
+  
+
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -46,8 +84,8 @@ export default function Home() {
 
   useEffect(() => {
     if (postsWithUserData.length > 0 && postsWithUserData[0].userData?.id) {
-      console.log('User ID:', postsWithUserData[0].userData.id);
-      localStorage.setItem('userId', postsWithUserData[0].userData.id);
+     // console.log('User ID:', postsWithUserData[0].userData.id);
+      //localStorage.setItem('userId', postsWithUserData[0].userData.id);
     }
   }, [postsWithUserData]);
   
