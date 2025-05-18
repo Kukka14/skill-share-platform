@@ -67,6 +67,14 @@ export default function Profile() {
     }
   }, [posts, userData.id]);
 
+  // Add an event listener to refresh following count when follow status changes
+  useEffect(() => {
+    window.addEventListener('follow-status-changed', fetchFollowingCount);
+    return () => {
+      window.removeEventListener('follow-status-changed', fetchFollowingCount);
+    };
+  }, [userData.id]);
+
   console.log('User ID:', userData.id);
   localStorage.setItem('userId', userData.id);
 

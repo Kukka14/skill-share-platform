@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-
 export default function Home() {
   const [posts, setPosts] = useState([]);
   const [postsWithUserData, setPostsWithUserData] = useState([]);
@@ -18,6 +17,7 @@ export default function Home() {
   const [commentCounts, setCommentCounts] = useState({});
   const [newComment, setNewComment] = useState({});
   const [showComments, setShowComments] = useState({});
+  const [followStatus, setFollowStatus] = useState({}); // Add this state for follow status
 
   const getCurrentUserId = () => {
     if (user?.id) return user.id;
@@ -60,6 +60,12 @@ export default function Home() {
   useEffect(() => {
     console.log('Current user:', user);
   }, [user]);
+
+  useEffect(() => {
+    if (postsWithUserData.length > 0 && getCurrentUserId()) {
+      fetchFollowStatus();
+    }
+  }, [postsWithUserData]);
 
   const fetchPosts = async () => {
     const token = localStorage.getItem('token');
@@ -198,6 +204,83 @@ export default function Home() {
       setLikeCounts(newLikeCounts);
     } catch (error) {
       console.error('Error fetching like status:', error);
+    }
+  };
+
+  const fetchFollowStatus = async () => {
+    const token = localStorage.getItem('token');
+    const currentUserId = getCurrentUserId();
+    if (!token || !currentUserId) return;
+    
+    try {
+      const newFollowStatus = {};
+      
+      await Promise.all(postsWithUserData.map(async (post) => {
+        if (post.userId === currentUserId) return; // Skip our own posts
+        
+        try {
+          const response = await fetch(`${BACKEND_URL}/api/follows/status?followerId=${currentUserId}&followedId=${post.userId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const isFollowing = await response.json();
+            newFollowStatus[post.userId] = isFollowing;
+          }
+        } catch (error) {
+          console.error(`Error fetching follow status for user ${post.userId}:`, error);
+        }
+      }));
+      
+      setFollowStatus(newFollowStatus);
+    } catch (error) {
+      console.error('Error fetching follow status:', error);
+    }
+  };
+
+  const handleFollowToggle = async (userId, isCurrentlyFollowing) => {
+    const token = localStorage.getItem('token');
+    const currentUserId = getCurrentUserId();
+    
+    if (!token || !currentUserId) {
+      alert('You must be logged in to follow users');
+      return;
+    }
+    
+    try {
+      // Optimistic UI update
+      setFollowStatus(prev => ({ ...prev, [userId]: !isCurrentlyFollowing }));
+      
+      const method = isCurrentlyFollowing ? 'DELETE' : 'POST';
+      const url = `${BACKEND_URL}/api/follows?followerId=${currentUserId}&followedId=${userId}`;
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        // Revert on failure
+        const errorText = await response.text();
+        console.error(`Error ${isCurrentlyFollowing ? 'unfollowing' : 'following'} user:`, errorText);
+        setFollowStatus(prev => ({ ...prev, [userId]: isCurrentlyFollowing }));
+        alert(`Failed to ${isCurrentlyFollowing ? 'unfollow' : 'follow'} user: ${errorText || 'Unknown error'}`);
+      } else {
+        console.log(`Successfully ${isCurrentlyFollowing ? 'unfollowed' : 'followed'} user ${userId}`);
+        
+        // Dispatch an event to notify other components (like Profile) that follow status changed
+        window.dispatchEvent(new CustomEvent('follow-status-changed'));
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      // Revert on failure
+      setFollowStatus(prev => ({ ...prev, [userId]: isCurrentlyFollowing }));
+      alert(`Error ${isCurrentlyFollowing ? 'unfollowing' : 'following'} user: ${error.message}`);
     }
   };
   
@@ -430,13 +513,14 @@ export default function Home() {
                   </div>
                   {post.userId !== getCurrentUserId() && (
                     <button 
-                      className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md"
-                      onClick={() => {
-                        // Follow functionality will go here
-                        alert(`Follow ${post.userData ? post.userData.firstName : 'this user'}`);
-                      }}
+                      className={`px-3 py-1 ${
+                        followStatus[post.userId] 
+                          ? 'bg-gray-300 hover:bg-gray-400 text-gray-800' 
+                          : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      } text-sm font-medium rounded-md transition-colors`}
+                      onClick={() => handleFollowToggle(post.userId, followStatus[post.userId])}
                     >
-                      Follow
+                      {followStatus[post.userId] ? 'Following' : 'Follow'}
                     </button>
                   )}
                 </div>
