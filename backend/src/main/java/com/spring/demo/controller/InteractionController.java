@@ -10,7 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/interactions")
-@CrossOrigin(origins = "*")
+
 public class InteractionController {
 
     private final LikeService likeService;
