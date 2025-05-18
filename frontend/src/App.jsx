@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navigation from './components/Navigation';
@@ -11,25 +11,16 @@ import LearningPlanPage from './pages/LearningPlanPage';
 import PostViewPage from './PostViewPage';
 import StatusViewPage from './StatusViewPage';
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children;
-};
-
 function AppContent() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  const ProtectedRoute = ({ children }) => {
+    if (isLoading) {
+      return <div>Loading...</div>;
+    }
+    return isAuthenticated ? children : <Navigate to="/login" />;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
@@ -37,16 +28,16 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route 
-            path="/" 
+          <Route
+            path="/home"
             element={
               <ProtectedRoute>
                 <Home />
               </ProtectedRoute>
-            } 
+            }
           />
-
-           <Route 
+          <Route path="/" element={<Navigate to="/home" />} />
+          <Route 
             path="/notifications" 
             element={
               <ProtectedRoute>
@@ -54,7 +45,6 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
-
           <Route 
           path="/posts/:postId" 
           element={
@@ -83,7 +73,6 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
-
           <Route 
             path="/learning-plan" 
             element={
@@ -100,11 +89,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <AppContent />
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 
 export default function Home() {
@@ -8,28 +9,40 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const BACKEND_URL = 'http://localhost:8080';
+  const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
     fetchPosts();
-  }, []);
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     if (posts.length > 0) {
       fetchUserDataForPosts();
+    } else {
+      setIsLoading(false);
     }
   }, [posts]);
 
   //added by nethmi 
   useEffect(() => {
-  if (postsWithUserData.length > 0 && postsWithUserData[0].userData?.id) {
-    console.log('User ID:', postsWithUserData[0].userData.id);
-    localStorage.setItem('userId', postsWithUserData[0].userData.id);
-  }
-}, [postsWithUserData]);
+    if (postsWithUserData.length > 0 && postsWithUserData[0].userData?.id) {
+      console.log('User ID:', postsWithUserData[0].userData.id);
+      localStorage.setItem('userId', postsWithUserData[0].userData.id);
+    }
+  }, [postsWithUserData]);
 
   const fetchPosts = async () => {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) {
+      setError('Please login to view posts');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/posts`, {
@@ -45,10 +58,14 @@ export default function Home() {
 
       const data = await response.json();
       console.log('Fetched posts:', data);
-      const postList = data._embedded?.postList || [];
+      
+      // Handle both array and _embedded.postList formats
+      const postList = Array.isArray(data) ? data : (data._embedded?.postList || []);
       setPosts(postList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (error) {
+      console.error('Error fetching posts:', error);
       setError('Failed to load posts: ' + error.message);
+      setIsLoading(false);
     }
   };
 
@@ -84,6 +101,7 @@ export default function Home() {
       console.log('All posts with user data:', postsWithUsers);
       setPostsWithUserData(postsWithUsers);
     } catch (error) {
+      console.error('Error fetching user data:', error);
       setError('Failed to load user data: ' + error.message);
     } finally {
       setIsLoading(false);
@@ -154,7 +172,7 @@ export default function Home() {
                       <div key={index} className={`relative ${
                         post.mediaUrls.length === 3 && index === 0 ? 'col-span-2' : ''
                       }`}>
-                        {post.mediaTypes[index]?.startsWith('video/') ? (
+                        {post.mediaTypes?.[index]?.startsWith('video/') ? (
                           <video
                             src={getFullImageUrl(url)}
                             className={`w-full ${

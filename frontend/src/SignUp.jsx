@@ -1,6 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axiosInstance from './utils/axios';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from './utils/firebase';
+
+const API_BASE_URL = 'http://localhost:8080';
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -8,11 +11,30 @@ export default function SignUp() {
     email: '',
     password: '',
     firstName: '',
-    lastName: ''
+    lastName: '',
+    googleId: '',
+    profileImage: ''
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // If coming from Google login, pre-fill the form
+    if (location.state?.email) {
+      const { email, name, googleId, profileImage } = location.state;
+      const [firstName, lastName] = name.split(' ');
+      setFormData(prev => ({
+        ...prev,
+        email,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        googleId,
+        profileImage
+      }));
+    }
+  }, [location]);
 
   const handleChange = (e) => {
     setFormData({
@@ -21,31 +43,61 @@ export default function SignUp() {
     });
   };
 
+  const handleGoogleSignup = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // Pre-fill the form with Google data
+      const [firstName, lastName] = user.displayName.split(' ');
+      setFormData(prev => ({
+        ...prev,
+        email: user.email,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        googleId: user.uid,
+        profileImage: user.photoURL
+      }));
+    } catch (error) {
+      console.error('Google signup error:', error);
+      setError('Failed to sign up with Google. Please try again.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
-      await axiosInstance.post('/auth/signup', formData);
-      navigate('/login');
+      const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'An error occurred during signup');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      navigate('/home');
     } catch (error) {
       console.error('Signup error:', error);
-      if (error.response?.data?.message) {
-        setError(error.response.data.message);
-      } else if (!error.response) {
-        setError('Cannot connect to the server. Please try again later.');
-      } else {
-        setError('An error occurred during signup. Please try again.');
-      }
+      setError(error.message || 'Failed to connect to the server. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
         <h2 className="text-center text-2xl font-bold text-gray-900">
           Create your account
         </h2>
@@ -132,6 +184,26 @@ export default function SignUp() {
             {isLoading ? 'Creating account...' : 'Sign up'}
           </button>
         </form>
+
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={handleGoogleSignup}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              Sign up with Google
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
