@@ -8,6 +8,8 @@ export default function Navigation() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -48,13 +50,31 @@ export default function Navigation() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (userData?.id) {
-      fetch(`http://localhost:8080/api/notifications/unread-count?userId=${userData.id}`)
-        .then(res => res.json())
-        .then(data => setUnreadCount(data.count || 0))
-        .catch(err => console.error('Error fetching unread count:', err));
+  const fetchUnreadNotifications = async () => {
+    const token = localStorage.getItem('token');
+    const userId = localStorage.getItem('userId');
+    if (!token || !userId) return;
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/notifications/user/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+
+      const data = await response.json();
+      const hasUnread = data.some(notification => notification.read === false);
+      setHasUnreadNotifications(hasUnread);
+    } catch (err) {
+      console.error('Error checking notifications:', err);
     }
-  }, [userData]);
+  };
+
+  fetchUnreadNotifications();
+}, []);
+
 
   const handleLogout = async () => {
     try {
@@ -132,29 +152,31 @@ export default function Navigation() {
           <div className="flex items-center space-x-4">
             {isAuthenticated && (
               <button
-                onClick={() => navigate('/notifications')}
-                className="relative text-gray-600 hover:text-gray-800"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 7.165 6 9.388 6 12v2.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"
-                  />
-                </svg>
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 block h-4 w-4 rounded-full ring-2 ring-white bg-red-500 text-xs text-white flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
+  onClick={() => navigate('/notifications')}
+  className="relative text-gray-600 hover:text-gray-800"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="h-6 w-6"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 7.165 6 9.388 6 12v2.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"
+    />
+  </svg>
+
+  {/* 🔵 Blue dot indicator */}
+  {hasUnreadNotifications && (
+    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white"></span>
+
+  )}
+</button>
+
             )}
 
             {isAuthenticated ? (

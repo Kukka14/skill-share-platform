@@ -8,6 +8,8 @@ import Home from './Home';
 import Profile from './Profile';
 import NotificationsDashboard from './NotificationsDashboard';
 import LearningPlanPage from './pages/LearningPlanPage';
+import PostViewPage from './PostViewPage';
+import StatusViewPage from './StatusViewPage';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -43,6 +45,26 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+          path="/posts/:postId" 
+          element={
+            <ProtectedRoute>
+              <PostViewPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/status/:statusId" 
+          element={
+            <ProtectedRoute>
+              <StatusViewPage />
+            </ProtectedRoute>
+          } 
+        />
+
+          {/* <Route path="/posts/:postId" element={<PostViewPage />} /> */}
+
           <Route 
             path="/profile" 
             element={
