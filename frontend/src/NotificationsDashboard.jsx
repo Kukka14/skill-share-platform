@@ -87,7 +87,14 @@ export default function NotificationsDashboard() {
       setFiltered(notifications.filter(n => n.postId));
     } else if (filterType === 'Status') {
       setFiltered(notifications.filter(n => n.statusId));
-    } else {
+      
+    } else if (filterType === 'Comment') {
+      setFiltered(notifications.filter(n => n.commentId));
+    }else if (filterType === 'Like') {
+      setFiltered(notifications.filter(n => n.likeId));
+    }
+    
+  else {
       setFiltered(notifications.filter(n => n.type === filterType));
     }
   }, [filterType, notifications]);
