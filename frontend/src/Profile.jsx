@@ -46,7 +46,9 @@ export default function Profile() {
   const [newComment, setNewComment] = useState({});
   const [showComments, setShowComments] = useState({});
   const [followingCount, setFollowingCount] = useState(0);
-  const [followersCount, setFollowersCount] = useState(0); // Add followers count state
+  const [followersCount, setFollowersCount] = useState(0);
+  const [editingComment, setEditingComment] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
   const navigate = useNavigate();
   const BACKEND_URL = 'http://localhost:8080';
 
@@ -59,7 +61,7 @@ export default function Profile() {
     if (userData.id) {
       fetchUserPosts();
       fetchFollowingCount();
-      fetchFollowersCount(); // Add this call to fetch followers count
+      fetchFollowersCount();
     }
   }, [userData.id]);
 
@@ -69,7 +71,6 @@ export default function Profile() {
     }
   }, [posts, userData.id]);
 
-  // Add an event listener to refresh following and followers count when follow status changes
   useEffect(() => {
     const handleFollowStatusChange = () => {
       fetchFollowingCount();
@@ -180,7 +181,6 @@ export default function Profile() {
       const data = await response.json();
       console.log('Received posts data:', data);
       
-      // Sort posts by createdAt in descending order (newest first)
       const sortedPosts = (data._embedded?.postList || []).sort((a, b) => {
         return new Date(b.createdAt) - new Date(a.createdAt);
       });
@@ -205,7 +205,6 @@ export default function Profile() {
       
       await Promise.all(posts.map(async (post) => {
         try {
-          // Fetch like count
           const countResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes/count`, {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -217,7 +216,6 @@ export default function Profile() {
             newLikeCounts[post.id] = count;
           }
           
-          // Check if user has liked post
           const likesResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes`, {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -392,6 +390,90 @@ export default function Profile() {
     }
   };
 
+  const handleEditComment = (comment) => {
+    setEditingComment(comment.id);
+    setEditCommentText(comment.content);
+  };
+
+  const cancelEditComment = () => {
+    setEditingComment(null);
+    setEditCommentText('');
+  };
+
+  const saveEditComment = async (postId, commentId) => {
+    const token = localStorage.getItem('token');
+    if (!token || !editCommentText.trim()) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/interactions/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editCommentText)
+      });
+      
+      if (response.ok) {
+        const updatedComment = await response.json();
+        
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId].map(comment => 
+            comment.id === commentId ? updatedComment : comment
+          )
+        }));
+        
+        setEditingComment(null);
+        setEditCommentText('');
+      } else {
+        const errorText = await response.text();
+        console.error('Error updating comment:', errorText);
+        alert(`Failed to update comment: ${errorText || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert(`Error updating comment: ${error.message}`);
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) {
+      return;
+    }
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/interactions/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId].filter(comment => comment.id !== commentId)
+        }));
+        
+        setCommentCounts(prev => ({
+          ...prev,
+          [postId]: Math.max(0, (prev[postId] || 1) - 1)
+        }));
+      } else {
+        const errorText = await response.text();
+        console.error('Error deleting comment:', errorText);
+        alert(`Failed to delete comment: ${errorText || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert(`Error deleting comment: ${error.message}`);
+    }
+  };
+
   const handleLike = async (postId) => {
     const token = localStorage.getItem('token');
     if (!token || !userData.id) {
@@ -400,7 +482,6 @@ export default function Profile() {
     }
     
     try {
-      // Optimistic UI update
       const wasLiked = likedPosts[postId];
       setLikedPosts(prev => ({ ...prev, [postId]: !wasLiked }));
       setLikeCounts(prev => ({ 
@@ -419,7 +500,6 @@ export default function Profile() {
       
       if (!response.ok) {
         console.error('Error toggling like:', await response.text());
-        // Revert optimistic update on failure
         setLikedPosts(prev => ({ ...prev, [postId]: wasLiked }));
         setLikeCounts(prev => ({ 
           ...prev, 
@@ -438,7 +518,6 @@ export default function Profile() {
       const file = e.target.files[0];
       setSelectedImage(file);
       
-      // Create preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -661,11 +740,9 @@ export default function Profile() {
     };
   }, [isViewingStatus, selectedStatusIndex]);
 
-  // Helper function to get full image URL
   const getFullImageUrl = (imagePath) => {
     if (!imagePath) return '';
     if (imagePath.startsWith('http')) return imagePath;
-    // The image path should already be in the correct format (/uploads/status/filename)
     return `${BACKEND_URL}${imagePath}`;
   };
 
@@ -680,7 +757,6 @@ export default function Profile() {
 
       setNewPostMedia(files);
       
-      // Create previews for all files
       const previews = [];
       files.forEach(file => {
         const reader = new FileReader();
@@ -724,7 +800,6 @@ export default function Profile() {
       }
 
       const newPost = await response.json();
-      // Add new post at the beginning of the array (already sorted by createdAt)
       setPosts([newPost, ...posts]);
       setIsPostModalOpen(false);
       setNewPostDescription('');
@@ -797,7 +872,6 @@ export default function Profile() {
       }
 
       const updatedPost = await response.json();
-      // Update the post in the array while maintaining the sort order
       setPosts(posts.map(post => 
         post.id === updatedPost.id ? updatedPost : post
       ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
@@ -836,16 +910,13 @@ export default function Profile() {
 
       console.log('Delete response status:', response.status);
       
-      // Handle different response scenarios
       if (response.ok || response.status === 204 || response.status === 500) {
-        // Even if we get a 500, if the post is gone from the list, consider it a success
         console.log('Post deletion attempted, checking if post was removed');
         setPosts(posts.filter(post => post.id !== postId));
         fetchUserPosts();
         setError('Post deleted successfully');
         setTimeout(() => setError(''), 3000);
       } else {
-        // Try to get error message from response
         let errorMessage = 'Failed to delete post';
         try {
           const errorData = await response.json();
@@ -863,7 +934,6 @@ export default function Profile() {
         posts: posts
       });
       
-      // Only show error if the post still exists
       if (posts.some(post => post.id === postId)) {
         setError(`Failed to delete post: ${error.message}`);
       }
@@ -1462,13 +1532,59 @@ export default function Profile() {
                                   )}
                                 </div>
                                 <div className="bg-gray-100 rounded-lg p-2 flex-grow">
-                                  <p className="text-xs font-medium">
-                                    {comment.user ? `${comment.user.firstName} ${comment.user.lastName}` : 'Unknown User'}
-                                  </p>
-                                  <p className="text-sm">{comment.content}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {new Date(comment.createdAt).toLocaleString()}
-                                  </p>
+                                  <div className="flex justify-between items-start">
+                                    <p className="text-xs font-medium">
+                                      {comment.user ? `${comment.user.firstName} ${comment.user.lastName}` : 'Unknown User'}
+                                    </p>
+                                    {comment.user?.id === userData.id && (
+                                      <div className="flex space-x-2">
+                                        <button 
+                                          onClick={() => handleEditComment(comment)}
+                                          className="text-xs text-blue-600 hover:text-blue-800"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteComment(post.id, comment.id)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {editingComment === comment.id ? (
+                                    <div className="mt-1">
+                                      <textarea
+                                        value={editCommentText}
+                                        onChange={(e) => setEditCommentText(e.target.value)}
+                                        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        rows="2"
+                                      />
+                                      <div className="flex justify-end space-x-2 mt-1">
+                                        <button
+                                          onClick={cancelEditComment}
+                                          className="px-2 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={() => saveEditComment(post.id, comment.id)}
+                                          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm">{comment.content}</p>
+                                      <p className="text-xs text-gray-500">
+                                        {new Date(comment.createdAt).toLocaleString()}
+                                      </p>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             ))
