@@ -46,6 +46,7 @@ export default function Profile() {
   const [newComment, setNewComment] = useState({});
   const [showComments, setShowComments] = useState({});
   const [followingCount, setFollowingCount] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0); // Add followers count state
   const navigate = useNavigate();
   const BACKEND_URL = 'http://localhost:8080';
 
@@ -58,6 +59,7 @@ export default function Profile() {
     if (userData.id) {
       fetchUserPosts();
       fetchFollowingCount();
+      fetchFollowersCount(); // Add this call to fetch followers count
     }
   }, [userData.id]);
 
@@ -67,11 +69,16 @@ export default function Profile() {
     }
   }, [posts, userData.id]);
 
-  // Add an event listener to refresh following count when follow status changes
+  // Add an event listener to refresh following and followers count when follow status changes
   useEffect(() => {
-    window.addEventListener('follow-status-changed', fetchFollowingCount);
+    const handleFollowStatusChange = () => {
+      fetchFollowingCount();
+      fetchFollowersCount();
+    };
+    
+    window.addEventListener('follow-status-changed', handleFollowStatusChange);
     return () => {
-      window.removeEventListener('follow-status-changed', fetchFollowingCount);
+      window.removeEventListener('follow-status-changed', handleFollowStatusChange);
     };
   }, [userData.id]);
 
@@ -297,6 +304,28 @@ export default function Profile() {
       }
     } catch (error) {
       console.error('Error fetching following count:', error);
+    }
+  };
+
+  const fetchFollowersCount = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/follows/followers/count?userId=${userData.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const count = await response.json();
+        setFollowersCount(count);
+      } else {
+        console.error('Failed to fetch followers count:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error fetching followers count:', error);
     }
   };
 
@@ -863,10 +892,15 @@ export default function Profile() {
             {/* Status Section */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
+                <div className="flex items-center space-x-4">
                   <h2 className="text-xl font-semibold text-gray-900">My Status</h2>
-                  <div className="ml-4 px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
-                    <span className="font-medium">{followingCount}</span> Following
+                  <div className="flex items-center space-x-3">
+                    <div className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
+                      <span className="font-medium">{followingCount}</span> Following
+                    </div>
+                    <div className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
+                      <span className="font-medium">{followersCount}</span> Followers
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
