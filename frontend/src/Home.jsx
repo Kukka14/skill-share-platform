@@ -150,6 +150,7 @@ export default function Home() {
       
       await Promise.all(postsWithUserData.map(async (post) => {
         try {
+          // Fetch like count
           const countResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes/count`, {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -158,11 +159,13 @@ export default function Home() {
           
           if (countResponse.ok) {
             const count = await countResponse.json();
+            console.log(`Like count for post ${post.id}:`, count);
             newLikeCounts[post.id] = count;
           } else {
             console.error(`Error fetching like count for post ${post.id}:`, await countResponse.text());
           }
           
+          // Fetch all likes to check if user liked the post
           const likesResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes`, {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -173,7 +176,12 @@ export default function Home() {
             const likes = await likesResponse.json();
             console.log(`Likes for post ${post.id}:`, likes);
             
-            const userLiked = Array.isArray(likes) && likes.some(like => like.userId === currentUserId);
+            // Explicitly check if the current user has liked this post
+            const userLiked = Array.isArray(likes) && likes.some(like => {
+              return like.userId === currentUserId;
+            });
+            
+            console.log(`User ${currentUserId} has liked post ${post.id}:`, userLiked);
             newLikedPosts[post.id] = userLiked;
           } else {
             console.error(`Error fetching likes for post ${post.id}:`, await likesResponse.text());
@@ -183,8 +191,8 @@ export default function Home() {
         }
       }));
       
-      console.log('Liked posts map:', newLikedPosts);
-      console.log('Like counts map:', newLikeCounts);
+      console.log('Final liked posts map:', newLikedPosts);
+      console.log('Final like counts map:', newLikeCounts);
       
       setLikedPosts(newLikedPosts);
       setLikeCounts(newLikeCounts);
@@ -206,46 +214,52 @@ export default function Home() {
     try {
       console.log(`Attempting to ${likedPosts[postId] ? 'unlike' : 'like'} post ${postId} for user ${currentUserId}`);
       
-      if (likedPosts[postId]) {
-        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${currentUserId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const responseText = await response.text();
-        console.log('Response from unlike:', responseText);
-        
-        if (response.ok) {
-          console.log('Successfully unliked post');
-          setLikedPosts(prev => ({ ...prev, [postId]: false }));
-          setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 1) - 1) }));
-        } else {
-          console.error('Error unliking post:', responseText);
-          alert(`Failed to unlike post: ${responseText || 'Unknown error'}`);
-        }
+      // Optimistic UI update - update UI immediately before API completes
+      const wasLiked = likedPosts[postId];
+      if (wasLiked) {
+        // Optimistically unlike
+        setLikedPosts(prev => ({ ...prev, [postId]: false }));
+        setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 1) - 1) }));
       } else {
-        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${currentUserId}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const responseText = await response.text();
-        console.log('Response from like:', responseText);
-        
-        if (response.ok) {
-          console.log('Successfully liked post');
-          setLikedPosts(prev => ({ ...prev, [postId]: true }));
-          setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-        } else {
-          console.error('Error liking post:', responseText);
-          alert(`Failed to like post: ${responseText || 'Unknown error'}`);
+        // Optimistically like
+        setLikedPosts(prev => ({ ...prev, [postId]: true }));
+        setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+      }
+      
+      // Now perform the actual API call
+      const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${currentUserId}`, {
+        method: wasLiked ? 'DELETE' : 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
+      });
+      
+      const responseText = await response.text();
+      console.log(`Response from ${wasLiked ? 'unlike' : 'like'}:`, responseText);
+      
+      if (!response.ok) {
+        // Special handling for "already liked" error
+        if (responseText.includes("already liked")) {
+          console.log("Post was already liked, updating UI accordingly");
+          setLikedPosts(prev => ({ ...prev, [postId]: true }));
+          // Refresh like count to ensure it's accurate
+          fetchLikeStatus();
+          return;
+        }
+        
+        // For other errors, revert the optimistic update
+        console.error(`Error ${wasLiked ? 'unliking' : 'liking'} post:`, responseText);
+        alert(`Failed to ${wasLiked ? 'unlike' : 'like'} post: ${responseText || 'Unknown error'}`);
+        
+        // Revert the UI
+        setLikedPosts(prev => ({ ...prev, [postId]: wasLiked }));
+        setLikeCounts(prev => ({ 
+          ...prev, 
+          [postId]: wasLiked ? (prev[postId] || 0) + 1 : Math.max(0, (prev[postId] || 1) - 1) 
+        }));
+      } else {
+        console.log(`Successfully ${wasLiked ? 'unliked' : 'liked'} post`);
       }
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -405,7 +419,7 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="flex-grow">
                     <p className="text-xs text-gray-400">User ID: {post.userId}</p>
                     <p className="font-medium text-gray-900">
                       {post.userData ? `${post.userData.firstName} ${post.userData.lastName}` : 'Unknown User'}
@@ -414,6 +428,17 @@ export default function Home() {
                       {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString()}
                     </p>
                   </div>
+                  {post.userId !== getCurrentUserId() && (
+                    <button 
+                      className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md"
+                      onClick={() => {
+                        // Follow functionality will go here
+                        alert(`Follow ${post.userData ? post.userData.firstName : 'this user'}`);
+                      }}
+                    >
+                      Follow
+                    </button>
+                  )}
                 </div>
 
                 <p className="text-gray-700">{post.description}</p>
@@ -462,10 +487,13 @@ export default function Home() {
                       className={`flex items-center ${likedPosts[post.id] ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
                       onClick={() => handleLike(post.id)}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill={likedPosts[post.id] ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" 
+                        fill={likedPosts[post.id] ? "currentColor" : "none"} 
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                       </svg>
-                      Like {likeCounts[post.id] > 0 && `(${likeCounts[post.id]})`}
+                      <span>Like{likeCounts[post.id] > 0 ? ` (${likeCounts[post.id]})` : ''}</span>
                     </button>
                     <button 
                       className="flex items-center text-gray-500 hover:text-blue-600"
