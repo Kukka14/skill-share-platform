@@ -37,45 +37,67 @@ public class CommentService {
 
     // Create a new comment
     public Comment createComment(String userId, String postId, String content) {
-        // Input validation
-        if (content == null || content.trim().isEmpty()) {
-            throw new IllegalArgumentException("Comment content cannot be empty");
+        try {
+            // Input validation
+            if (content == null || content.trim().isEmpty()) {
+                throw new IllegalArgumentException("Comment content cannot be empty");
+            }
+
+            // Verify the user exists
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+
+            // Verify the post exists
+            Post post = postRepository.findById(postId)
+                    .orElseThrow(() -> new IllegalArgumentException("Post not found with ID: " + postId));
+
+            System.out.println("Creating comment with content: " + content);
+            System.out.println("For user: " + userId + " on post: " + postId);
+
+            Comment comment = new Comment();
+            comment.setUser(user);
+            comment.setPostId(postId);
+            comment.setContent(content.trim());
+            // Using java.time.Instant directly to avoid timezone issues
+            comment.setCreatedAt(System.currentTimeMillis());
+            comment.setUpdatedAt(System.currentTimeMillis());
+            
+            System.out.println("Saving comment to database");
+            Comment savedComment = commentRepository.save(comment);
+            System.out.println("Comment saved with ID: " + savedComment.getId());
+
+            // Only create notification if the comment author is not the post owner
+            if (!userId.equals(post.getUserId())) {
+                try {
+                    // Create the notification
+                    Notification notification = new Notification();
+                    notification.setUserId(user.getId()); // who commented
+                    notification.setUsername(user.getUsername());
+                    notification.setPostId(postId);
+                    notification.setPostUserId(post.getUserId()); // post owner who receives the notification
+                    notification.setDescription(user.getUsername() + " commented on your post.");
+                    notification.setRead(false);
+                    notification.setTimestamp(LocalDateTime.now());
+
+                    System.out.println("Saving notification for comment");
+                    Notification savedNotification = notificationRepository.save(notification);
+                    System.out.println("Notification saved successfully");
+                } catch (Exception e) {
+                    // Log error but don't fail the comment operation if notification fails
+                    System.err.println("Error creating notification for comment: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+
+            return savedComment;
+        } catch (IllegalArgumentException e) {
+            // Re-throw these to be caught by the controller
+            throw e;
+        } catch (Exception e) {
+            System.err.println("Unexpected error in createComment: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to create comment: " + e.getMessage(), e);
         }
-
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
-
-        Comment comment = new Comment();
-        comment.setUser(user);
-        comment.setPostId(postId);
-        comment.setContent(content.trim());
-        comment.setCreatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
-        comment.setUpdatedAt(LocalDateTime.now().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
-        
-        //added by nethmi
-        Comment savedComment = commentRepository.save(comment);
-
-        // Fetch the post to get the owner's userId
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
-
-        // Create the notification
-        Notification notification = new Notification();
-        notification.setUserId(userId);
-        notification.setUsername(user.getUsername());
-        notification.setPostId(postId);
-        notification.setPostUserId(post.getUserId());
-        notification.setDescription(user.getUsername() + " commented on a post.");
-        notification.setRead(false);
-        notification.setTimestamp(LocalDateTime.now());
-
-        // Save to notifications collection
-        notificationRepository.save(notification);
-
-        return savedComment;
-        
-        //return commentRepository.save(comment);
-
     }
 
     // Update an existing comment

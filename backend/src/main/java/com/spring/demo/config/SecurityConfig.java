@@ -42,6 +42,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/api/notifications/**").authenticated()
+                .requestMatchers("/api/interactions/**").authenticated()  // Add this line
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session

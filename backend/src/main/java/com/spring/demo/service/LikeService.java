@@ -37,43 +37,60 @@ public class LikeService {
 
     // Create a new like
     public Like createLike(String userId, String postId) {
-        // Check if like already exists
-        Optional<Like> existingLike = likeRepository.findByUserIdAndPostId(userId, postId);
-        if (existingLike.isPresent()) {
-            throw new IllegalArgumentException("User has already liked this post");
+        try {
+            // Check if like already exists
+            Optional<Like> existingLike = likeRepository.findByUserIdAndPostId(userId, postId);
+            if (existingLike.isPresent()) {
+                throw new IllegalArgumentException("User has already liked this post");
+            }
+
+            // Verify both user and post exist
+            User likingUser = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+            
+            Post likedPost = postRepository.findById(postId)
+                    .orElseThrow(() -> new IllegalArgumentException("Post not found with ID: " + postId));
+
+            // Create new like
+            Like like = new Like();
+            like.setUserId(userId);
+            like.setPostId(postId);
+
+            System.out.println("Saving like for user: " + userId + " on post: " + postId);
+            Like savedLike = likeRepository.save(like);
+            System.out.println("Like saved successfully with ID: " + savedLike.getId());
+
+            // Only create notification if the post owner is not the one liking
+            if (!userId.equals(likedPost.getUserId())) {
+                try {
+                    // Create the notification
+                    Notification notification = new Notification();
+                    notification.setUserId(likingUser.getId()); // who performed the action
+                    notification.setUsername(likingUser.getUsername());
+                    notification.setPostId(postId);
+                    notification.setPostUserId(likedPost.getUserId()); // post owner's ID who will receive the notification
+                    notification.setDescription(likingUser.getUsername() + " liked your post.");
+                    notification.setRead(false);
+                    notification.setTimestamp(LocalDateTime.now());
+
+                    Notification savedNotification = notificationRepository.save(notification);
+                    System.out.println("Notification saved successfully");
+                } catch (Exception e) {
+                    // Log error but don't fail the like operation if notification fails
+                    System.err.println("Error creating notification for like: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+
+            return savedLike;
+        } catch (IllegalArgumentException e) {
+            // Re-throw these to be caught by the controller
+            throw e;
+        } catch (Exception e) {
+            System.err.println("Unexpected error in createLike: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to create like: " + e.getMessage(), e);
         }
-
-        // Create new like
-        Like like = new Like();
-        like.setUserId(userId);
-        like.setPostId(postId);
-
-        Like savedLike = likeRepository.save(like);
-
-       
-
-        // Fetch the liking user
-        User likingUser = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Liking user not found"));
-
-        // Fetch the liked post
-        Post likedPost = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
-
-        // Create the notification
-        Notification notification = new Notification();
-        notification.setUserId(userId); // who liked
-        notification.setUsername(likingUser.getUsername());
-        notification.setPostId(postId);
-        notification.setPostUserId(likedPost.getUserId()); // post owner's ID
-        notification.setDescription(likingUser.getUsername() + " liked a post.");
-        notification.setRead(false);
-        notification.setTimestamp(LocalDateTime.now());
-
-        notificationRepository.save(notification);
-
-        return savedLike;
-
     }
 
     // Remove a like
