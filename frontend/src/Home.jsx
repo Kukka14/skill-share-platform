@@ -20,6 +20,8 @@ export default function Home() {
   const [followStatus, setFollowStatus] = useState({});
   const [editingComment, setEditingComment] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingPostId, setRecordingPostId] = useState(null);
 
   const getCurrentUserId = () => {
     if (user?.id) return user.id;
@@ -537,6 +539,51 @@ export default function Home() {
     return `${BACKEND_URL}${imagePath}`;
   };
 
+  const startVoiceComment = (postId) => {
+    if (!window.webkitSpeechRecognition && !window.SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Try Chrome or Edge.");
+      return;
+    }
+
+    setRecordingPostId(postId);
+    setIsRecording(true);
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      console.log('Voice recording started...');
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      console.log('Voice transcript:', transcript);
+      
+      setNewComment(prev => ({
+        ...prev,
+        [postId]: prev[postId] ? `${prev[postId]} ${transcript}` : transcript
+      }));
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      alert(`Error recording: ${event.error}`);
+      setIsRecording(false);
+      setRecordingPostId(null);
+    };
+
+    recognition.onend = () => {
+      console.log('Voice recording ended');
+      setIsRecording(false);
+      setRecordingPostId(null);
+    };
+
+    recognition.start();
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -775,6 +822,25 @@ export default function Home() {
                               }
                             }}
                           />
+                          <button
+                            type="button"
+                            onClick={() => startVoiceComment(post.id)}
+                            disabled={isRecording}
+                            className={`px-3 py-1 bg-gray-100 text-gray-700 border-t border-b hover:bg-gray-200 ${
+                              isRecording && recordingPostId === post.id ? 'bg-red-100 text-red-600 animate-pulse' : ''
+                            }`}
+                            title="Voice comment"
+                          >
+                            {isRecording && recordingPostId === post.id ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                              </svg>
+                            )}
+                          </button>
                           <button
                             className="bg-blue-500 text-white px-3 py-1 rounded-r-lg hover:bg-blue-600 disabled:bg-gray-300"
                             onClick={() => submitComment(post.id)}
