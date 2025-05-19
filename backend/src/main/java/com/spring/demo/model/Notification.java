@@ -21,6 +21,8 @@ public class Notification {
     private String postId;
     private String postUserId;
     private String statusId;
+    private String commentId;
+    private String LikeId;
     private String statusUserId;
     private String description;
      @JsonProperty("read")
@@ -106,6 +108,22 @@ public String getStatusUserId() {
 
 public void setStatusUserId(String statusUserId) {
     this.statusUserId = statusUserId;
+}
+
+
+public String getcommentId() {
+    return commentId;
+}
+
+public void setcommentId(String commentId) {
+    this.commentId = commentId;
+}
+
+public String getLikeId() {
+    return LikeId;
+}
+public void setLikeId(String LikeId) {
+    this.LikeId = LikeId;
 }
 
     

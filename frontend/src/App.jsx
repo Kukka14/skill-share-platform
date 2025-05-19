@@ -11,6 +11,12 @@ import LearningPlanPage from './pages/LearningPlanPage';
 import PostViewPage from './PostViewPage';
 import StatusViewPage from './StatusViewPage';
 
+
+// ✅ Import ToastContainer from react-toastify
+import { ToastContainer } from 'react-toastify';
+// ✅ Import react-toastify CSS once globally
+import 'react-toastify/dist/ReactToastify.css';
+
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -83,6 +89,28 @@ function AppContent() {
           />
         </Routes>
       </div>
+         {/* ✅ Add ToastContainer near root to show toast notifications globally */}
+      <ToastContainer 
+        position="top-right" 
+        autoClose={30000} 
+        hideProgressBar={false} 
+        newestOnTop={false} 
+        closeOnClick 
+        rtl={false} 
+        pauseOnFocusLoss 
+        draggable 
+        pauseOnHover 
+        
+  progressClassName="!bg-blue-600 !shadow-blue-300"
+  // progressStyle={{
+  //   backgroundColor: '#2563eb',         // progress bar blue-600
+  //   boxShadow: '0 0 10pxrgb(182, 201, 223)',      // light blue glow shadow
+  // }}
+        
+  
+  
+      />
+
     </div>
   );
 }
