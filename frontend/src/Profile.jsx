@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import VoiceInput from './components/VoiceInput';
 
 export default function Profile() {
   const [userData, setUserData] = useState({
@@ -1617,6 +1618,11 @@ export default function Profile() {
                                   if (e.key === 'Enter' && newComment[post.id]) {
                                     submitComment(post.id);
                                   }
+                                }}
+                              />
+                              <VoiceInput 
+                                onTranscriptionComplete={(text) => {
+                                  setNewComment(prev => ({ ...prev, [post.id]: text }));
                                 }}
                               />
                               <button

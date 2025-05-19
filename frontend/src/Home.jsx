@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import VoiceInput from './components/VoiceInput';
 
 export default function Home() {
   const [posts, setPosts] = useState([]);
@@ -975,6 +976,7 @@ useEffect(() => {
                     )}
                   </div>
                   <div className="flex-grow">
+                    <p className="text-xs text-gray-400">User ID: {post.userId}</p>
                     <p className="font-medium text-gray-900">
                       {post.userData ? `${post.userData.firstName} ${post.userData.lastName}` : 'Unknown User'}
                     </p>
@@ -1174,6 +1176,11 @@ useEffect(() => {
                               if (e.key === 'Enter' && newComment[post.id]) {
                                 submitComment(post.id);
                               }
+                            }}
+                          />
+                          <VoiceInput 
+                            onTranscriptionComplete={(text) => {
+                              setNewComment(prev => ({ ...prev, [post.id]: text }));
                             }}
                           />
                           <button
