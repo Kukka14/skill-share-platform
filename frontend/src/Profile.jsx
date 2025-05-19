@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import LearningPlan from './components/learning-plan/LearningPlan';
 
 export default function Profile() {
   const [userData, setUserData] = useState({
@@ -40,9 +39,16 @@ export default function Profile() {
   const [newPostDescription, setNewPostDescription] = useState('');
   const [newPostMedia, setNewPostMedia] = useState([]);
   const [newPostMediaPreviews, setNewPostMediaPreviews] = useState([]);
-  const [isLearningPlanModalOpen, setIsLearningPlanModalOpen] = useState(false);
   const [likedPosts, setLikedPosts] = useState({});
   const [likeCounts, setLikeCounts] = useState({});
+  const [comments, setComments] = useState({});
+  const [commentCounts, setCommentCounts] = useState({});
+  const [newComment, setNewComment] = useState({});
+  const [showComments, setShowComments] = useState({});
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [editingComment, setEditingComment] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
   const navigate = useNavigate();
   const BACKEND_URL = 'http://localhost:8080';
 
@@ -54,6 +60,8 @@ export default function Profile() {
   useEffect(() => {
     if (userData.id) {
       fetchUserPosts();
+      fetchFollowingCount();
+      fetchFollowersCount();
     }
   }, [userData.id]);
 
@@ -62,6 +70,18 @@ export default function Profile() {
       fetchLikeStatus();
     }
   }, [posts, userData.id]);
+
+  useEffect(() => {
+    const handleFollowStatusChange = () => {
+      fetchFollowingCount();
+      fetchFollowersCount();
+    };
+    
+    window.addEventListener('follow-status-changed', handleFollowStatusChange);
+    return () => {
+      window.removeEventListener('follow-status-changed', handleFollowStatusChange);
+    };
+  }, [userData.id]);
 
   console.log('User ID:', userData.id);
   localStorage.setItem('userId', userData.id);
@@ -161,7 +181,6 @@ export default function Profile() {
       const data = await response.json();
       console.log('Received posts data:', data);
       
-      // Sort posts by createdAt in descending order (newest first)
       const sortedPosts = (data._embedded?.postList || []).sort((a, b) => {
         return new Date(b.createdAt) - new Date(a.createdAt);
       });
@@ -186,7 +205,6 @@ export default function Profile() {
       
       await Promise.all(posts.map(async (post) => {
         try {
-          // Fetch like count
           const countResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes/count`, {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -198,7 +216,6 @@ export default function Profile() {
             newLikeCounts[post.id] = count;
           }
           
-          // Check if user has liked post
           const likesResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${post.id}/likes`, {
             headers: {
               'Authorization': `Bearer ${token}`
@@ -222,6 +239,241 @@ export default function Profile() {
     }
   };
 
+  const fetchComments = async (postId) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      console.log(`Fetching comments for post ${postId}`);
+      
+      const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/comments`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const fetchedComments = await response.json();
+        console.log(`Fetched comments for post ${postId}:`, fetchedComments);
+        setComments(prev => ({
+          ...prev,
+          [postId]: fetchedComments
+        }));
+      } else {
+        console.error(`Error fetching comments for post ${postId}:`, await response.text());
+      }
+      
+      const countResponse = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/comments/count`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (countResponse.ok) {
+        const count = await countResponse.json();
+        setCommentCounts(prev => ({
+          ...prev,
+          [postId]: count
+        }));
+      } else {
+        console.error(`Error fetching comment count for post ${postId}:`, await countResponse.text());
+      }
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  };
+
+  const fetchFollowingCount = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/follows/count?userId=${userData.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const count = await response.json();
+        setFollowingCount(count);
+      } else {
+        console.error('Failed to fetch following count:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error fetching following count:', error);
+    }
+  };
+
+  const fetchFollowersCount = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/follows/followers/count?userId=${userData.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const count = await response.json();
+        setFollowersCount(count);
+      } else {
+        console.error('Failed to fetch followers count:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error fetching followers count:', error);
+    }
+  };
+
+  const handleComment = async (postId) => {
+    if (!showComments[postId]) {
+      setShowComments(prev => ({ ...prev, [postId]: true }));
+      fetchComments(postId);
+    } else {
+      setShowComments(prev => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  const submitComment = async (postId) => {
+    const token = localStorage.getItem('token');
+    if (!token || !userData.id || !newComment[postId]) {
+      console.log('Cannot submit comment: missing token, userId, or comment text');
+      return;
+    }
+    
+    try {
+      console.log(`Submitting comment to post ${postId} with userId ${userData.id}: "${newComment[postId]}"`);
+      
+      const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/comments?userId=${userData.id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newComment[postId])
+      });
+      
+      const responseText = await response.text();
+      console.log('Response from submit comment:', responseText);
+      
+      if (response.ok) {
+        let addedComment;
+        try {
+          addedComment = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Error parsing comment response:', e);
+          addedComment = { id: Date.now(), content: newComment[postId], user: userData };
+        }
+        
+        console.log('Added comment:', addedComment);
+        
+        setComments(prev => ({
+          ...prev,
+          [postId]: [...(prev[postId] || []), addedComment]
+        }));
+        
+        setCommentCounts(prev => ({
+          ...prev,
+          [postId]: (prev[postId] || 0) + 1
+        }));
+        
+        setNewComment(prev => ({ ...prev, [postId]: '' }));
+      } else {
+        console.error('Error response:', response.status, responseText);
+        alert(`Failed to add comment: ${responseText || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      alert(`Error adding comment: ${error.message}`);
+    }
+  };
+
+  const handleEditComment = (comment) => {
+    setEditingComment(comment.id);
+    setEditCommentText(comment.content);
+  };
+
+  const cancelEditComment = () => {
+    setEditingComment(null);
+    setEditCommentText('');
+  };
+
+  const saveEditComment = async (postId, commentId) => {
+    const token = localStorage.getItem('token');
+    if (!token || !editCommentText.trim()) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/interactions/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editCommentText)
+      });
+      
+      if (response.ok) {
+        const updatedComment = await response.json();
+        
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId].map(comment => 
+            comment.id === commentId ? updatedComment : comment
+          )
+        }));
+        
+        setEditingComment(null);
+        setEditCommentText('');
+      } else {
+        const errorText = await response.text();
+        console.error('Error updating comment:', errorText);
+        alert(`Failed to update comment: ${errorText || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert(`Error updating comment: ${error.message}`);
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) {
+      return;
+    }
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/interactions/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId].filter(comment => comment.id !== commentId)
+        }));
+        
+        setCommentCounts(prev => ({
+          ...prev,
+          [postId]: Math.max(0, (prev[postId] || 1) - 1)
+        }));
+      } else {
+        const errorText = await response.text();
+        console.error('Error deleting comment:', errorText);
+        alert(`Failed to delete comment: ${errorText || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert(`Error deleting comment: ${error.message}`);
+    }
+  };
+
   const handleLike = async (postId) => {
     const token = localStorage.getItem('token');
     if (!token || !userData.id) {
@@ -230,36 +482,31 @@ export default function Profile() {
     }
     
     try {
-      if (likedPosts[postId]) {
-        // Unlike post
-        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${userData.id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (response.ok) {
-          setLikedPosts(prev => ({ ...prev, [postId]: false }));
-          setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 1) - 1) }));
-        } else {
-          console.error('Error unliking post:', await response.text());
+      const wasLiked = likedPosts[postId];
+      setLikedPosts(prev => ({ ...prev, [postId]: !wasLiked }));
+      setLikeCounts(prev => ({ 
+        ...prev, 
+        [postId]: wasLiked ? 
+          Math.max(0, (prev[postId] || 1) - 1) : 
+          ((prev[postId] || 0) + 1) 
+      }));
+      
+      const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${userData.id}`, {
+        method: wasLiked ? 'DELETE' : 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      } else {
-        // Like post
-        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${userData.id}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (response.ok) {
-          setLikedPosts(prev => ({ ...prev, [postId]: true }));
-          setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-        } else {
-          console.error('Error liking post:', await response.text());
-        }
+      });
+      
+      if (!response.ok) {
+        console.error('Error toggling like:', await response.text());
+        setLikedPosts(prev => ({ ...prev, [postId]: wasLiked }));
+        setLikeCounts(prev => ({ 
+          ...prev, 
+          [postId]: wasLiked ? 
+            (prev[postId] || 0) + 1 : 
+            Math.max(0, (prev[postId] || 1) - 1)
+        }));
       }
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -271,7 +518,6 @@ export default function Profile() {
       const file = e.target.files[0];
       setSelectedImage(file);
       
-      // Create preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -494,11 +740,9 @@ export default function Profile() {
     };
   }, [isViewingStatus, selectedStatusIndex]);
 
-  // Helper function to get full image URL
   const getFullImageUrl = (imagePath) => {
     if (!imagePath) return '';
     if (imagePath.startsWith('http')) return imagePath;
-    // The image path should already be in the correct format (/uploads/status/filename)
     return `${BACKEND_URL}${imagePath}`;
   };
 
@@ -513,7 +757,6 @@ export default function Profile() {
 
       setNewPostMedia(files);
       
-      // Create previews for all files
       const previews = [];
       files.forEach(file => {
         const reader = new FileReader();
@@ -557,7 +800,6 @@ export default function Profile() {
       }
 
       const newPost = await response.json();
-      // Add new post at the beginning of the array (already sorted by createdAt)
       setPosts([newPost, ...posts]);
       setIsPostModalOpen(false);
       setNewPostDescription('');
@@ -630,7 +872,6 @@ export default function Profile() {
       }
 
       const updatedPost = await response.json();
-      // Update the post in the array while maintaining the sort order
       setPosts(posts.map(post => 
         post.id === updatedPost.id ? updatedPost : post
       ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
@@ -669,16 +910,13 @@ export default function Profile() {
 
       console.log('Delete response status:', response.status);
       
-      // Handle different response scenarios
       if (response.ok || response.status === 204 || response.status === 500) {
-        // Even if we get a 500, if the post is gone from the list, consider it a success
         console.log('Post deletion attempted, checking if post was removed');
         setPosts(posts.filter(post => post.id !== postId));
         fetchUserPosts();
         setError('Post deleted successfully');
         setTimeout(() => setError(''), 3000);
       } else {
-        // Try to get error message from response
         let errorMessage = 'Failed to delete post';
         try {
           const errorData = await response.json();
@@ -696,7 +934,6 @@ export default function Profile() {
         posts: posts
       });
       
-      // Only show error if the post still exists
       if (posts.some(post => post.id === postId)) {
         setError(`Failed to delete post: ${error.message}`);
       }
@@ -725,7 +962,17 @@ export default function Profile() {
             {/* Status Section */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">My Status</h2>
+                <div className="flex items-center space-x-4">
+                  <h2 className="text-xl font-semibold text-gray-900">My Status</h2>
+                  <div className="flex items-center space-x-3">
+                    <div className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
+                      <span className="font-medium">{followingCount}</span> Following
+                    </div>
+                    <div className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700">
+                      <span className="font-medium">{followersCount}</span> Followers
+                    </div>
+                  </div>
+                </div>
                 <div className="flex items-center space-x-4">
                   {statusUpdateTime && (
                     <span className="text-sm text-gray-500">
@@ -1217,18 +1464,24 @@ export default function Profile() {
                       <div className="flex items-center space-x-4">
                         <button 
                           onClick={() => handleLike(post.id)}
-                          className={`flex items-center ${likedPosts[post.id] ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
+                          className={`flex items-center ${likedPosts[post.id] === true ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill={likedPosts[post.id] ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" 
+                            fill={likedPosts[post.id] === true ? "currentColor" : "none"} 
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                           </svg>
-                          Like {likeCounts[post.id] > 0 && `(${likeCounts[post.id]})`}
+                          <span>Like{likeCounts[post.id] > 0 ? ` (${likeCounts[post.id]})` : ''}</span>
                         </button>
-                        <button className="flex items-center text-gray-500 hover:text-blue-600">
+                        <button 
+                          onClick={() => handleComment(post.id)}
+                          className="flex items-center text-gray-500 hover:text-blue-600"
+                        >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                           </svg>
-                          Comment
+                          Comment {commentCounts[post.id] > 0 && `(${commentCounts[post.id]})`}
                         </button>
                         <button className="flex items-center text-gray-500 hover:text-blue-600">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1256,6 +1509,128 @@ export default function Profile() {
                         </button>
                       </div>
                     </div>
+                    
+                    {/* Add comment section */}
+                    {showComments[post.id] && (
+                      <div className="mt-4 border-t pt-4">
+                        <h3 className="font-medium mb-2">Comments</h3>
+                        <div className="space-y-3">
+                          {comments[post.id]?.length > 0 ? (
+                            comments[post.id].map((comment) => (
+                              <div key={comment.id} className="flex space-x-2">
+                                <div className="h-8 w-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                                  {comment.user?.profileImageUrl ? (
+                                    <img
+                                      src={getFullImageUrl(comment.user.profileImageUrl)}
+                                      alt={`${comment.user.firstName}'s profile`}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                                      {comment.user?.firstName?.charAt(0) || '?'}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="bg-gray-100 rounded-lg p-2 flex-grow">
+                                  <div className="flex justify-between items-start">
+                                    <p className="text-xs font-medium">
+                                      {comment.user ? `${comment.user.firstName} ${comment.user.lastName}` : 'Unknown User'}
+                                    </p>
+                                    {comment.user?.id === userData.id && (
+                                      <div className="flex space-x-2">
+                                        <button 
+                                          onClick={() => handleEditComment(comment)}
+                                          className="text-xs text-blue-600 hover:text-blue-800"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteComment(post.id, comment.id)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {editingComment === comment.id ? (
+                                    <div className="mt-1">
+                                      <textarea
+                                        value={editCommentText}
+                                        onChange={(e) => setEditCommentText(e.target.value)}
+                                        className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        rows="2"
+                                      />
+                                      <div className="flex justify-end space-x-2 mt-1">
+                                        <button
+                                          onClick={cancelEditComment}
+                                          className="px-2 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={() => saveEditComment(post.id, comment.id)}
+                                          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm">{comment.content}</p>
+                                      <p className="text-xs text-gray-500">
+                                        {new Date(comment.createdAt).toLocaleString()}
+                                      </p>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
+                          )}
+                          
+                          <div className="flex space-x-2 mt-3">
+                            <div className="h-8 w-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                              {userData?.profileImageUrl ? (
+                                <img
+                                  src={getFullImageUrl(userData.profileImageUrl)}
+                                  alt="Your profile"
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                                  {userData?.firstName?.charAt(0) || '?'}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-grow flex">
+                              <input
+                                type="text"
+                                className="border rounded-l-lg px-3 py-1 w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="Write a comment..."
+                                value={newComment[post.id] || ''}
+                                onChange={(e) => setNewComment(prev => ({ ...prev, [post.id]: e.target.value }))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && newComment[post.id]) {
+                                    submitComment(post.id);
+                                  }
+                                }}
+                              />
+                              <button
+                                className="bg-blue-500 text-white px-3 py-1 rounded-r-lg hover:bg-blue-600 disabled:bg-gray-300"
+                                onClick={() => submitComment(post.id)}
+                                disabled={!newComment[post.id]}
+                              >
+                                Post
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
