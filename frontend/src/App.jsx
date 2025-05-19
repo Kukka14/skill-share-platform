@@ -10,6 +10,7 @@ import NotificationsDashboard from './NotificationsDashboard';
 import LearningPlanPage from './pages/LearningPlanPage';
 import PostViewPage from './PostViewPage';
 import StatusViewPage from './StatusViewPage';
+import FollowersProfile from './FollowersProfile';
 
 
 // ✅ Import ToastContainer from react-toastify
@@ -76,6 +77,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile/:userId" 
+            element={
+              <ProtectedRoute>
+                <FollowersProfile />
               </ProtectedRoute>
             } 
           />

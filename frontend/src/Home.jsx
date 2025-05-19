@@ -962,7 +962,10 @@ useEffect(() => {
             <div key={post.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
               <div className="p-4">
                 <div className="flex items-center space-x-3 mb-3">
-                  <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-200">
+                  <div 
+                    className="h-10 w-10 rounded-full overflow-hidden bg-gray-200 cursor-pointer"
+                    onClick={() => navigate(`/profile/${post.userId}`)}
+                  >
                     {post.userData?.profileImageUrl ? (
                       <img
                         src={getFullImageUrl(post.userData.profileImageUrl)}
@@ -977,7 +980,10 @@ useEffect(() => {
                   </div>
                   <div className="flex-grow">
                     <p className="text-xs text-gray-400">User ID: {post.userId}</p>
-                    <p className="font-medium text-gray-900">
+                    <p 
+                      className="font-medium text-gray-900 cursor-pointer hover:text-blue-600"
+                      onClick={() => navigate(`/profile/${post.userId}`)}
+                    >
                       {post.userData ? `${post.userData.firstName} ${post.userData.lastName}` : 'Unknown User'}
                     </p>
                     <p className="text-sm text-gray-500">
