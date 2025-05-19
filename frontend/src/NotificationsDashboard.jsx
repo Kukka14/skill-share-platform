@@ -44,6 +44,8 @@ export default function NotificationsDashboard() {
     if (userData.id) localStorage.setItem('userId', userData.id);
   }, [userData.id]);
 
+///fetch notifications--------------------------
+
   useEffect(() => {
   if (!token || !userData.id) return;
 
@@ -57,20 +59,21 @@ export default function NotificationsDashboard() {
       const sortedData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
       const withPosts = await Promise.all(
-        sortedData.map(async (notif) => {
-          if (!notif.postId) return notif;
-          try {
-            const postRes = await fetch(`http://localhost:8080/api/posts/${notif.postId}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!postRes.ok) throw new Error();
-            const postData = await postRes.json();
-            return { ...notif, post: postData };
-          } catch {
-            return notif;
-          }
-        })
-      );
+  sortedData.map(async (notif) => {
+    if (!notif.postId) return personalize(notif);
+
+    try {
+      const postRes = await fetch(`http://localhost:8080/api/posts/${notif.postId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!postRes.ok) throw new Error();
+      const postData = await postRes.json();
+      return personalize({ ...notif, post: postData });
+    } catch {
+      return personalize(notif);
+    }
+  })
+);
 
       // ✅ Filter unread notifications
       const currentUnreadCount = withPosts.filter(n => !n.read).length;
@@ -97,6 +100,24 @@ export default function NotificationsDashboard() {
 
   return () => clearInterval(interval); // Cleanup on unmount
 }, [token, userData.id, notifications]);
+
+
+const personalize = (notif) => {
+  const isCurrentUser = notif.senderId === userData.id;
+
+  if (isCurrentUser) {
+    if (notif.description?.includes(`${userData.name} has successfully signed up`)) {
+      return { ...notif, description: 'You have successfully signed up.' };
+    }
+    // Add more conditions for likes/comments
+  }
+
+  return notif;
+};
+
+
+
+
   // ✅ Updated filtering logic
   // useEffect(() => {
   //   if (filterType === 'All') {
