@@ -74,7 +74,7 @@ const fetchUserLearningPlans = async () => {
     if (plans.length > 0) {
       toast.info(
         <div>
-          <div>You have a learning plan. Don’t forget to complete it!</div>
+          <div>You have a learning plan. Don't forget to complete it!</div>
           <button
             style={{
               marginTop: '8px',
@@ -975,7 +975,6 @@ useEffect(() => {
                     )}
                   </div>
                   <div className="flex-grow">
-                    <p className="text-xs text-gray-400">User ID: {post.userId}</p>
                     <p className="font-medium text-gray-900">
                       {post.userData ? `${post.userData.firstName} ${post.userData.lastName}` : 'Unknown User'}
                     </p>
