@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-
 export default function Home() {
   const [posts, setPosts] = useState([]);
   const [postsWithUserData, setPostsWithUserData] = useState([]);
@@ -18,10 +17,16 @@ export default function Home() {
   const [commentCounts, setCommentCounts] = useState({});
   const [newComment, setNewComment] = useState({});
   const [showComments, setShowComments] = useState({});
+
+  const [followStatus, setFollowStatus] = useState({});
+  const [editingComment, setEditingComment] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
+
   
 
   const [userData, setUserData] = useState({ id: '' });
   const token = localStorage.getItem('token'); // ✅ Add this line
+
 
 
   const getCurrentUserId = () => {
@@ -98,6 +103,12 @@ useEffect(() => {
   useEffect(() => {
     console.log('Current user:', user);
   }, [user]);
+
+  useEffect(() => {
+    if (postsWithUserData.length > 0 && getCurrentUserId()) {
+      fetchFollowStatus();
+    }
+  }, [postsWithUserData]);
 
   const fetchPosts = async () => {
     const token = localStorage.getItem('token');
@@ -196,6 +207,7 @@ useEffect(() => {
           
           if (countResponse.ok) {
             const count = await countResponse.json();
+            console.log(`Like count for post ${post.id}:`, count);
             newLikeCounts[post.id] = count;
           } else {
             console.error(`Error fetching like count for post ${post.id}:`, await countResponse.text());
@@ -211,7 +223,11 @@ useEffect(() => {
             const likes = await likesResponse.json();
             console.log(`Likes for post ${post.id}:`, likes);
             
-            const userLiked = Array.isArray(likes) && likes.some(like => like.userId === currentUserId);
+            const userLiked = Array.isArray(likes) && likes.some(like => {
+              return like.userId === currentUserId;
+            });
+            
+            console.log(`User ${currentUserId} has liked post ${post.id}:`, userLiked);
             newLikedPosts[post.id] = userLiked;
           } else {
             console.error(`Error fetching likes for post ${post.id}:`, await likesResponse.text());
@@ -221,13 +237,85 @@ useEffect(() => {
         }
       }));
       
-      console.log('Liked posts map:', newLikedPosts);
-      console.log('Like counts map:', newLikeCounts);
+      console.log('Final liked posts map:', newLikedPosts);
+      console.log('Final like counts map:', newLikeCounts);
       
       setLikedPosts(newLikedPosts);
       setLikeCounts(newLikeCounts);
     } catch (error) {
       console.error('Error fetching like status:', error);
+    }
+  };
+
+  const fetchFollowStatus = async () => {
+    const token = localStorage.getItem('token');
+    const currentUserId = getCurrentUserId();
+    if (!token || !currentUserId) return;
+    
+    try {
+      const newFollowStatus = {};
+      
+      await Promise.all(postsWithUserData.map(async (post) => {
+        if (post.userId === currentUserId) return;
+        
+        try {
+          const response = await fetch(`${BACKEND_URL}/api/follows/status?followerId=${currentUserId}&followedId=${post.userId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const isFollowing = await response.json();
+            newFollowStatus[post.userId] = isFollowing;
+          }
+        } catch (error) {
+          console.error(`Error fetching follow status for user ${post.userId}:`, error);
+        }
+      }));
+      
+      setFollowStatus(newFollowStatus);
+    } catch (error) {
+      console.error('Error fetching follow status:', error);
+    }
+  };
+
+  const handleFollowToggle = async (userId, isCurrentlyFollowing) => {
+    const token = localStorage.getItem('token');
+    const currentUserId = getCurrentUserId();
+    
+    if (!token || !currentUserId) {
+      alert('You must be logged in to follow users');
+      return;
+    }
+    
+    try {
+      setFollowStatus(prev => ({ ...prev, [userId]: !isCurrentlyFollowing }));
+      
+      const method = isCurrentlyFollowing ? 'DELETE' : 'POST';
+      const url = `${BACKEND_URL}/api/follows?followerId=${currentUserId}&followedId=${userId}`;
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error ${isCurrentlyFollowing ? 'unfollowing' : 'following'} user:`, errorText);
+        setFollowStatus(prev => ({ ...prev, [userId]: isCurrentlyFollowing }));
+        alert(`Failed to ${isCurrentlyFollowing ? 'unfollow' : 'follow'} user: ${errorText || 'Unknown error'}`);
+      } else {
+        console.log(`Successfully ${isCurrentlyFollowing ? 'unfollowed' : 'followed'} user ${userId}`);
+        window.dispatchEvent(new CustomEvent('follow-status-changed'));
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      setFollowStatus(prev => ({ ...prev, [userId]: isCurrentlyFollowing }));
+      alert(`Error ${isCurrentlyFollowing ? 'unfollowing' : 'following'} user: ${error.message}`);
     }
   };
   
@@ -244,46 +332,44 @@ useEffect(() => {
     try {
       console.log(`Attempting to ${likedPosts[postId] ? 'unlike' : 'like'} post ${postId} for user ${currentUserId}`);
       
-      if (likedPosts[postId]) {
-        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${currentUserId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const responseText = await response.text();
-        console.log('Response from unlike:', responseText);
-        
-        if (response.ok) {
-          console.log('Successfully unliked post');
-          setLikedPosts(prev => ({ ...prev, [postId]: false }));
-          setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 1) - 1) }));
-        } else {
-          console.error('Error unliking post:', responseText);
-          alert(`Failed to unlike post: ${responseText || 'Unknown error'}`);
-        }
+      const wasLiked = likedPosts[postId];
+      if (wasLiked) {
+        setLikedPosts(prev => ({ ...prev, [postId]: false }));
+        setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 1) - 1) }));
       } else {
-        const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${currentUserId}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const responseText = await response.text();
-        console.log('Response from like:', responseText);
-        
-        if (response.ok) {
-          console.log('Successfully liked post');
-          setLikedPosts(prev => ({ ...prev, [postId]: true }));
-          setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
-        } else {
-          console.error('Error liking post:', responseText);
-          alert(`Failed to like post: ${responseText || 'Unknown error'}`);
+        setLikedPosts(prev => ({ ...prev, [postId]: true }));
+        setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+      }
+      
+      const response = await fetch(`${BACKEND_URL}/api/interactions/posts/${postId}/like?userId=${currentUserId}`, {
+        method: wasLiked ? 'DELETE' : 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
+      });
+      
+      const responseText = await response.text();
+      console.log(`Response from ${wasLiked ? 'unlike' : 'like'}:`, responseText);
+      
+      if (!response.ok) {
+        if (responseText.includes("already liked")) {
+          console.log("Post was already liked, updating UI accordingly");
+          setLikedPosts(prev => ({ ...prev, [postId]: true }));
+          fetchLikeStatus();
+          return;
+        }
+        
+        console.error(`Error ${wasLiked ? 'unliking' : 'liking'} post:`, responseText);
+        alert(`Failed to ${wasLiked ? 'unlike' : 'like'} post: ${responseText || 'Unknown error'}`);
+        
+        setLikedPosts(prev => ({ ...prev, [postId]: wasLiked }));
+        setLikeCounts(prev => ({ 
+          ...prev, 
+          [postId]: wasLiked ? (prev[postId] || 0) + 1 : Math.max(0, (prev[postId] || 1) - 1) 
+        }));
+      } else {
+        console.log(`Successfully ${wasLiked ? 'unliked' : 'liked'} post`);
       }
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -402,6 +488,90 @@ useEffect(() => {
     }
   };
 
+  const handleEditComment = (comment) => {
+    setEditingComment(comment.id);
+    setEditCommentText(comment.content);
+  };
+
+  const cancelEditComment = () => {
+    setEditingComment(null);
+    setEditCommentText('');
+  };
+
+  const saveEditComment = async (postId, commentId) => {
+    const token = localStorage.getItem('token');
+    if (!token || !editCommentText.trim()) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/interactions/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editCommentText)
+      });
+      
+      if (response.ok) {
+        const updatedComment = await response.json();
+        
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId].map(comment => 
+            comment.id === commentId ? updatedComment : comment
+          )
+        }));
+        
+        setEditingComment(null);
+        setEditCommentText('');
+      } else {
+        const errorText = await response.text();
+        console.error('Error updating comment:', errorText);
+        alert(`Failed to update comment: ${errorText || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert(`Error updating comment: ${error.message}`);
+    }
+  };
+
+  const handleDeleteComment = async (postId, commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) {
+      return;
+    }
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/interactions/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        setComments(prev => ({
+          ...prev,
+          [postId]: prev[postId].filter(comment => comment.id !== commentId)
+        }));
+        
+        setCommentCounts(prev => ({
+          ...prev,
+          [postId]: Math.max(0, (prev[postId] || 1) - 1)
+        }));
+      } else {
+        const errorText = await response.text();
+        console.error('Error deleting comment:', errorText);
+        alert(`Failed to delete comment: ${errorText || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert(`Error deleting comment: ${error.message}`);
+    }
+  };
+
   const getFullImageUrl = (imagePath) => {
     if (!imagePath) return '';
     if (imagePath.startsWith('http')) return imagePath;
@@ -443,7 +613,7 @@ useEffect(() => {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="flex-grow">
                     <p className="text-xs text-gray-400">User ID: {post.userId}</p>
                     <p className="font-medium text-gray-900">
                       {post.userData ? `${post.userData.firstName} ${post.userData.lastName}` : 'Unknown User'}
@@ -452,6 +622,18 @@ useEffect(() => {
                       {new Date(post.createdAt).toLocaleDateString()} at {new Date(post.createdAt).toLocaleTimeString()}
                     </p>
                   </div>
+                  {post.userId !== getCurrentUserId() && (
+                    <button 
+                      className={`px-3 py-1 ${
+                        followStatus[post.userId] 
+                          ? 'bg-gray-300 hover:bg-gray-400 text-gray-800' 
+                          : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      } text-sm font-medium rounded-md transition-colors`}
+                      onClick={() => handleFollowToggle(post.userId, followStatus[post.userId])}
+                    >
+                      {followStatus[post.userId] ? 'Following' : 'Follow'}
+                    </button>
+                  )}
                 </div>
 
                 <p className="text-gray-700">{post.description}</p>
@@ -500,10 +682,13 @@ useEffect(() => {
                       className={`flex items-center ${likedPosts[post.id] ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
                       onClick={() => handleLike(post.id)}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill={likedPosts[post.id] ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" 
+                        fill={likedPosts[post.id] ? "currentColor" : "none"} 
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                       </svg>
-                      Like {likeCounts[post.id] > 0 && `(${likeCounts[post.id]})`}
+                      <span>Like{likeCounts[post.id] > 0 ? ` (${likeCounts[post.id]})` : ''}</span>
                     </button>
                     <button 
                       className="flex items-center text-gray-500 hover:text-blue-600"
@@ -544,13 +729,59 @@ useEffect(() => {
                               )}
                             </div>
                             <div className="bg-gray-100 rounded-lg p-2 flex-grow">
-                              <p className="text-xs font-medium">
-                                {comment.user ? `${comment.user.firstName} ${comment.user.lastName}` : 'Unknown User'}
-                              </p>
-                              <p className="text-sm">{comment.content}</p>
-                              <p className="text-xs text-gray-500">
-                                {new Date(comment.createdAt).toLocaleString()}
-                              </p>
+                              <div className="flex justify-between items-start">
+                                <p className="text-xs font-medium">
+                                  {comment.user ? `${comment.user.firstName} ${comment.user.lastName}` : 'Unknown User'}
+                                </p>
+                                {comment.user?.id === getCurrentUserId() && (
+                                  <div className="flex space-x-2">
+                                    <button 
+                                      onClick={() => handleEditComment(comment)}
+                                      className="text-xs text-blue-600 hover:text-blue-800"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteComment(post.id, comment.id)}
+                                      className="text-xs text-red-600 hover:text-red-800"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {editingComment === comment.id ? (
+                                <div className="mt-1">
+                                  <textarea
+                                    value={editCommentText}
+                                    onChange={(e) => setEditCommentText(e.target.value)}
+                                    className="w-full p-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    rows="2"
+                                  />
+                                  <div className="flex justify-end space-x-2 mt-1">
+                                    <button
+                                      onClick={cancelEditComment}
+                                      className="px-2 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() => saveEditComment(post.id, comment.id)}
+                                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-sm">{comment.content}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(comment.createdAt).toLocaleString()}
+                                  </p>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))
