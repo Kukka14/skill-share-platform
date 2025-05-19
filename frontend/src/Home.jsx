@@ -12,6 +12,26 @@ export default function Home() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   
+  // User profile states
+  const [userData, setUserData] = useState({
+    id: '',
+    username: '',
+    email: '',
+    firstName: '',
+    lastName: '',
+    bio: '',
+    profileImageUrl: ''
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  
+  // Status related states
+  const [statuses, setStatuses] = useState([]);
+  const [isViewingStatus, setIsViewingStatus] = useState(false);
+  const [selectedStatusIndex, setSelectedStatusIndex] = useState(null);
+  const [statusUpdateTime, setStatusUpdateTime] = useState(null);
+  
   const [likedPosts, setLikedPosts] = useState({});
   const [likeCounts, setLikeCounts] = useState({});
   const [comments, setComments] = useState({});
@@ -130,7 +150,9 @@ useEffect(() => {
       navigate('/login');
       return;
     }
+    fetchUserProfile();
     fetchPosts();
+    fetchAllStatuses();
   }, [isAuthenticated, navigate]);
 
 
@@ -168,11 +190,96 @@ useEffect(() => {
     console.log('Current user:', user);
   }, [user]);
 
+
+  const fetchUserProfile = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/users/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
+        throw new Error('Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      setUserData(data);
+      if (data.profileImageUrl) {
+        setImagePreview(data.profileImageUrl);
+      }
+    } catch (error) {
+      console.error('Profile fetch error:', error);
+      setError('Failed to load profile data');
+    }
+  };
+
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedImage(file);
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const formData = new FormData();
+    if (selectedImage) {
+      formData.append('profileImage', selectedImage);
+    }
+    formData.append('firstName', userData.firstName);
+    formData.append('lastName', userData.lastName);
+    formData.append('bio', userData.bio);
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/users/${userData.id}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('Failed to update profile');
+
+      const updatedData = await response.json();
+      setUserData(updatedData);
+      setIsEditing(false);
+      setSelectedImage(null);
+    } catch (error) {
+      console.error('Update error:', error);
+      setError('Failed to update profile');
+    }
+  };
+
   useEffect(() => {
     if (postsWithUserData.length > 0 && getCurrentUserId()) {
       fetchFollowStatus();
     }
   }, [postsWithUserData]);
+
 
   const fetchPosts = async () => {
     const token = localStorage.getItem('token');
@@ -642,6 +749,45 @@ useEffect(() => {
     return `${BACKEND_URL}${imagePath}`;
   };
 
+  const fetchAllStatuses = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/status/all`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch statuses');
+
+      const data = await response.json();
+      setStatuses(data);
+    } catch (error) {
+      console.error('Status fetch error:', error);
+    }
+  };
+
+  const handleStatusClick = (index) => {
+    setSelectedStatusIndex(index);
+    setIsViewingStatus(true);
+  };
+
+  const handleNextStatus = () => {
+    if (selectedStatusIndex < statuses.length - 1) {
+      setSelectedStatusIndex(selectedStatusIndex + 1);
+    } else {
+      setIsViewingStatus(false);
+    }
+  };
+
+  const handlePrevStatus = () => {
+    if (selectedStatusIndex > 0) {
+      setSelectedStatusIndex(selectedStatusIndex - 1);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -657,6 +803,158 @@ useEffect(() => {
           {error && (
             <div className="rounded-md bg-red-50 p-4 text-red-700">
               {error}
+            </div>
+          )}
+
+          {/* User Profile Section */}
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-300 hover:shadow-xl">
+            <div className="relative h-56 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500">
+              {/* Decorative Elements */}
+              <div className="absolute inset-0 bg-black opacity-10"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full transform translate-x-32 -translate-y-32"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-5 rounded-full transform -translate-x-32 translate-y-32"></div>
+              
+              {/* Cover Image */}
+              <div className="absolute bottom-0 left-0 right-0 p-6">
+                <div className="flex items-end space-x-6">
+                  <div className="relative group">
+                    <div 
+                      className="h-36 w-36 rounded-full border-4 border-white overflow-hidden bg-white cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                      onClick={() => navigate('/profile')}
+                    >
+                      {imagePreview ? (
+                        <img
+                          src={getFullImageUrl(imagePreview)}
+                          alt="Profile"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-5xl text-gray-500">
+                          {userData?.firstName?.charAt(0) || '?'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-4 border-transparent group-hover:border-blue-400 transition-all duration-300"></div>
+                  </div>
+                  <div className="flex-grow pb-2">
+                    <h1 className="text-3xl font-bold text-white mb-2">
+                      Welcome,{' '}
+                      <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-100">
+                        {userData ? `${userData.firstName} ${userData.lastName}` : 'Loading...'}
+                      </span>
+                    </h1>
+                    <div className="flex items-center space-x-4">
+                      <p className="text-white text-opacity-90 text-lg">
+                        {userData?.bio || 'No bio yet'}
+                      </p>
+                      <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse"></span>
+                    </div>
+                    <div className="mt-3 flex items-center space-x-4 text-white text-opacity-80">
+                      <div className="flex items-center space-x-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span>@{userData?.username || 'user'}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span>{userData?.email || 'email@example.com'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Section */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Statuses</h2>
+            <div className="flex space-x-4 overflow-x-auto pb-4">
+              {statuses.map((status, index) => (
+                <div
+                  key={status.id}
+                  onClick={() => handleStatusClick(index)}
+                  className="flex-shrink-0 cursor-pointer"
+                >
+                  <div className="relative">
+                    <div className="h-20 w-20 rounded-full overflow-hidden border-4 border-blue-500">
+                      {status.imageUrl && (
+                        <img
+                          src={getFullImageUrl(status.imageUrl)}
+                          alt="Status"
+                          className="h-full w-full object-cover"
+                        />
+                      )}
+                    </div>
+                    {index === 0 && (
+                      <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white"></div>
+                    )}
+                  </div>
+                  <p className="mt-2 text-center text-sm text-gray-600 truncate w-20">
+                    {status.text || 'No text'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Status View Modal */}
+          {isViewingStatus && selectedStatusIndex !== null && (
+            <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
+              <div className="relative w-full h-full">
+                <div className="absolute top-4 right-4">
+                  <button
+                    onClick={() => setIsViewingStatus(false)}
+                    className="text-white bg-black bg-opacity-50 rounded-full p-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                {selectedStatusIndex > 0 && (
+                  <button
+                    onClick={handlePrevStatus}
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white bg-black bg-opacity-50 rounded-full p-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                )}
+                
+                <div className="h-full flex items-center justify-center">
+                  <div className="max-w-2xl w-full">
+                    {statuses[selectedStatusIndex].imageUrl && (
+                      <img
+                        src={getFullImageUrl(statuses[selectedStatusIndex].imageUrl)}
+                        alt="Status"
+                        className="w-full h-[80vh] object-contain"
+                      />
+                    )}
+                    {statuses[selectedStatusIndex].text && (
+                      <div className="absolute bottom-20 left-0 right-0 p-4 bg-black bg-opacity-50 text-white">
+                        <p className="text-center">{statuses[selectedStatusIndex].text}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {selectedStatusIndex < statuses.length - 1 && (
+                  <button
+                    onClick={handleNextStatus}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white bg-black bg-opacity-50 rounded-full p-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
