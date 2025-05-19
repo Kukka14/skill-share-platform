@@ -6,10 +6,17 @@ export default function Navigation() {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState({
+    id: '',
+    username: '',
+    email: '',
+    firstName: '',
+    lastName: '',
+    bio: '',
+    profileImageUrl: ''
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -21,7 +28,7 @@ export default function Navigation() {
       }
 
       try {
-        const response = await fetch('http://localhost:8080/api/users/profile', {
+        const response = await fetch('http://localhost:8080/api/users/me', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -30,7 +37,6 @@ export default function Navigation() {
 
         if (response.ok) {
           const data = await response.json();
-          console.log('Fetched user data:', data);
           setUserData(data);
         } else {
           console.error('Failed to fetch user data');
@@ -50,31 +56,30 @@ export default function Navigation() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-  const fetchUnreadNotifications = async () => {
-    const token = localStorage.getItem('token');
-    const userId = localStorage.getItem('userId');
-    if (!token || !userId) return;
+    const fetchUnreadNotifications = async () => {
+      const token = localStorage.getItem('token');
+      const userId = localStorage.getItem('userId');
+      if (!token || !userId) return;
 
-    try {
-      const response = await fetch(`http://localhost:8080/api/notifications/user/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      try {
+        const response = await fetch(`http://localhost:8080/api/notifications/user/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
 
-      if (!response.ok) throw new Error('Failed to fetch notifications');
+        if (!response.ok) throw new Error('Failed to fetch notifications');
 
-      const data = await response.json();
-      const hasUnread = data.some(notification => notification.read === false);
-      setHasUnreadNotifications(hasUnread);
-    } catch (err) {
-      console.error('Error checking notifications:', err);
-    }
-  };
+        const data = await response.json();
+        const hasUnread = data.some(notification => notification.read === false);
+        setHasUnreadNotifications(hasUnread);
+      } catch (err) {
+        console.error('Error checking notifications:', err);
+      }
+    };
 
-  fetchUnreadNotifications();
-}, []);
-
+    fetchUnreadNotifications();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -94,20 +99,6 @@ export default function Navigation() {
     if (!imagePath) return '';
     if (imagePath.startsWith('http')) return imagePath;
     return `http://localhost:8080${imagePath}`;
-  };
-
-  const getDisplayName = () => {
-    if (userData?.firstName && userData?.lastName) {
-      return `${userData.firstName} ${userData.lastName}`;
-    }
-    return userData?.username || 'User';
-  };
-
-  const getInitials = () => {
-    if (userData?.firstName && userData?.lastName) {
-      return `${userData.firstName.charAt(0)}${userData.lastName.charAt(0)}`;
-    }
-    return userData?.username?.charAt(0) || '?';
   };
 
   if (isLoading) {
@@ -152,59 +143,54 @@ export default function Navigation() {
           <div className="flex items-center space-x-4">
             {isAuthenticated && (
               <button
-  onClick={() => navigate('/notifications')}
-  className="relative text-gray-600 hover:text-gray-800"
->
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-6 w-6"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 7.165 6 9.388 6 12v2.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"
-    />
-  </svg>
-
-  {/* 🔵 Blue dot indicator */}
-  {hasUnreadNotifications && (
-    <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white"></span>
-
-  )}
-</button>
-
+                onClick={() => navigate('/notifications')}
+                className="relative text-gray-600 hover:text-gray-800"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 7.165 6 9.388 6 12v2.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"
+                  />
+                </svg>
+                {hasUnreadNotifications && (
+                  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white"></span>
+                )}
+              </button>
             )}
 
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
                 <Link
                   to="/profile"
-                  className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                  className="flex items-center space-x-3 px-4 py-2 rounded-full bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 transition-all duration-300"
                 >
-                  <div className="h-8 w-8 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
-                    {userData?.profileImageUrl ? (
-                      <img
-                        src={getFullImageUrl(userData.profileImageUrl)}
-                        alt={getDisplayName()}
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = '';
-                          e.target.parentElement.classList.add('bg-gray-200');
-                          e.target.parentElement.innerHTML = `<span class="text-gray-500 font-medium">${getInitials()}</span>`;
-                        }}
-                      />
-                    ) : (
-                      <span className="text-gray-500 font-medium">
-                        {getInitials()}
-                      </span>
-                    )}
+                  <div className="relative group">
+                    <div className="h-10 w-10 rounded-full border-2 border-white overflow-hidden bg-white shadow-md transform transition-all duration-300 group-hover:scale-105">
+                      {userData?.profileImageUrl ? (
+                        <img
+                          src={getFullImageUrl(userData.profileImageUrl)}
+                          alt={`${userData.username}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-xl text-gray-500">
+                          {userData?.firstName?.charAt(0) || '?'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-2 border-transparent group-hover:border-blue-400 transition-all duration-300"></div>
                   </div>
-                  <span>{getDisplayName()}</span>
+                  <span className="font-medium text-gray-700">
+                    {userData ? `${userData.username}` : 'Loading...'}
+                  </span>
                 </Link>
                 <button
                   onClick={handleLogout}
