@@ -78,6 +78,7 @@ public class CommentService {
                     notification.setDescription(user.getUsername() + " commented on your post.");
                     notification.setRead(false);
                     notification.setTimestamp(LocalDateTime.now());
+                    notification.setcommentId(savedComment.getId());
 
                     System.out.println("Saving notification for comment");
                     Notification savedNotification = notificationRepository.save(notification);

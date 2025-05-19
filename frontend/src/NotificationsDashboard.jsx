@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { toast } from 'react-toastify';  
+import 'react-toastify/dist/ReactToastify.css';
+
 export default function NotificationsDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -10,6 +13,8 @@ export default function NotificationsDashboard() {
   const [userData, setUserData] = useState({ id: '' });
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const [searchQuery, setSearchQuery] = useState('');
+
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -40,57 +45,102 @@ export default function NotificationsDashboard() {
   }, [userData.id]);
 
   useEffect(() => {
-    if (!token || !userData.id) return;
+  if (!token || !userData.id) return;
 
-    const fetchNotifications = async () => {
-      try {
-        const res = await fetch(`http://localhost:8080/api/notifications/user/${userData.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch notifications');
-        const data = await res.json();
-        const sortedData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/notifications/user/${userData.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch notifications');
+      const data = await res.json();
+      const sortedData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        const withPosts = await Promise.all(
-          sortedData.map(async (notif) => {
-            if (!notif.postId) return notif;
-            try {
-              const postRes = await fetch(`http://localhost:8080/api/posts/${notif.postId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (!postRes.ok) throw new Error();
-              const postData = await postRes.json();
-              return { ...notif, post: postData };
-            } catch {
-              return notif;
-            }
-          })
-        );
+      const withPosts = await Promise.all(
+        sortedData.map(async (notif) => {
+          if (!notif.postId) return notif;
+          try {
+            const postRes = await fetch(`http://localhost:8080/api/posts/${notif.postId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!postRes.ok) throw new Error();
+            const postData = await postRes.json();
+            return { ...notif, post: postData };
+          } catch {
+            return notif;
+          }
+        })
+      );
 
-        setNotifications(withPosts);
-        setFiltered(withPosts); // initially show all
-        setLoading(false);
-      } catch (err) {
-        setError(err.message || 'Error loading notifications');
-        setLoading(false);
+      // ✅ Filter unread notifications
+      const currentUnreadCount = withPosts.filter(n => !n.read).length;
+      const previousUnreadCount = notifications.filter(n => !n.read).length;
+
+      // 🛎️ Show toast only if new unread notifications are received
+      if (currentUnreadCount > previousUnreadCount) {
+        const newUnreadCount = currentUnreadCount - previousUnreadCount;
+        toast.success(`${newUnreadCount} new unread notification(s)`, { autoClose: 3000 });
       }
-    };
 
-    fetchNotifications();
-  }, [token, userData.id]);
-
-  // ✅ Updated filtering logic
-  useEffect(() => {
-    if (filterType === 'All') {
-      setFiltered(notifications);
-    } else if (filterType === 'Post') {
-      setFiltered(notifications.filter(n => n.postId));
-    } else if (filterType === 'Status') {
-      setFiltered(notifications.filter(n => n.statusId));
-    } else {
-      setFiltered(notifications.filter(n => n.type === filterType));
+      setNotifications(withPosts);
+      setFiltered(withPosts); // initially show all
+      setLoading(false);
+    } catch (err) {
+      setError(err.message || 'Error loading notifications');
+      setLoading(false);
     }
-  }, [filterType, notifications]);
+  };
+
+  fetchNotifications();
+
+  const interval = setInterval(fetchNotifications, 10000); // Poll every 10 seconds
+
+  return () => clearInterval(interval); // Cleanup on unmount
+}, [token, userData.id, notifications]);
+  // ✅ Updated filtering logic
+  // useEffect(() => {
+  //   if (filterType === 'All') {
+  //     setFiltered(notifications);
+  //   } else if (filterType === 'Post') {
+  //     setFiltered(notifications.filter(n => n.postId));
+  //   } else if (filterType === 'Status') {
+  //     setFiltered(notifications.filter(n => n.statusId));
+      
+  //   } else if (filterType === 'Comment') {
+  //     setFiltered(notifications.filter(n => n.commentId));
+  //   }else if (filterType === 'Like') {
+  //     setFiltered(notifications.filter(n => n.likeId));
+  //   }
+    
+  // else {
+  //     setFiltered(notifications.filter(n => n.type === filterType));
+  //   }
+  // }, [filterType, notifications]);
+
+
+
+  useEffect(() => {
+  let temp = notifications;
+
+  // Filter by type
+  if (filterType === 'Post') temp = temp.filter(n => n.postId);
+  else if (filterType === 'Status') temp = temp.filter(n => n.statusId);
+  else if (filterType === 'Comment') temp = temp.filter(n => n.commentId);
+  else if (filterType === 'Like') temp = temp.filter(n => n.likeId);
+  else if (filterType !== 'All') temp = temp.filter(n => n.type === filterType);
+
+  // Filter by search
+  if (searchQuery.trim() !== '') {
+    const query = searchQuery.toLowerCase();
+    temp = temp.filter(n =>
+      n.description?.toLowerCase().includes(query) ||
+      n.type?.toLowerCase().includes(query)
+    );
+  }
+
+  setFiltered(temp);
+}, [filterType, searchQuery, notifications]);
+
 
   const markAsRead = async (id) => {
     try {
@@ -218,6 +268,17 @@ export default function NotificationsDashboard() {
     <div className="min-h-screen bg-gray-50 py-10 px-6 md:px-20">
       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl p-6">
         <h2 className="text-2xl font-semibold text-black-800 mb-6 border-b pb-3">Notifications</h2>
+
+        <div className="mb-4">
+  <input
+    type="text"
+    placeholder="Search notifications..."
+    value={searchQuery}
+    onChange={(e) => setSearchQuery(e.target.value)}
+    className="w-full md:w-1/2 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+  />
+</div>
+
 
         {/* 🔘 Filter Buttons */}
         <div className="flex flex-wrap gap-3 mb-6">

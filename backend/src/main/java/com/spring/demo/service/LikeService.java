@@ -72,6 +72,7 @@ public class LikeService {
                     notification.setDescription(likingUser.getUsername() + " liked your post.");
                     notification.setRead(false);
                     notification.setTimestamp(LocalDateTime.now());
+                    notification.setLikeId(savedLike.getId());
 
                     Notification savedNotification = notificationRepository.save(notification);
                     System.out.println("Notification saved successfully");
