@@ -45,7 +45,6 @@ export default function Home() {
 
   
 
-  const [userData, setUserData] = useState({ id: '' });
   const token = localStorage.getItem('token'); // ✅ Add this line
 
 ///added by nethmi -----
