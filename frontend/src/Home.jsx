@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 export default function Home() {
   const [posts, setPosts] = useState([]);
@@ -27,6 +28,59 @@ export default function Home() {
   const [userData, setUserData] = useState({ id: '' });
   const token = localStorage.getItem('token'); // ✅ Add this line
 
+///added by nethmi -----
+const [overduePlans, setOverduePlans] = useState([]);
+const [showReminder, setShowReminder] = useState(false);
+
+
+
+const fetchUserLearningPlans = async () => {
+  const token = localStorage.getItem('token');
+  const userId = localStorage.getItem('userId');
+  if (!token || !userId) return;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/learning-plans/user/${userId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      console.error('Response status:', response.status);
+      throw new Error('Failed to fetch learning plans');
+    }
+
+    const plans = await response.json();
+    console.log('Learning plans:', plans);
+
+    if (plans.length > 0) {
+      toast.info(
+        <div>
+          <div>You have a learning plan. Don’t forget to complete it!</div>
+          <button
+            style={{
+              marginTop: '8px',
+              padding: '4px 10px',
+              background: 'blue',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+            onClick={() => navigate('/learning-plan')}
+          >
+            Check Deadlines 
+          </button>
+        </div>,
+        { autoClose: false } // optional: keep the toast open until user closes it
+      );
+    }
+  } catch (err) {
+    console.error('Error fetching learning plans:', err);
+  }
+};
+
+
+///added by nethmi above -----
 
 
   const getCurrentUserId = () => {
@@ -78,6 +132,16 @@ useEffect(() => {
     }
     fetchPosts();
   }, [isAuthenticated, navigate]);
+
+
+  ///added by nethmi -----
+
+useEffect(() => {
+  if (isAuthenticated) {
+    fetchUserLearningPlans();
+  }
+}, [isAuthenticated]);
+
 
   useEffect(() => {
     if (posts.length > 0) {

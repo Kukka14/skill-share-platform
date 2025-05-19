@@ -92,7 +92,7 @@ function AppContent() {
          {/* ✅ Add ToastContainer near root to show toast notifications globally */}
       <ToastContainer 
         position="top-right" 
-        autoClose={3000} 
+        autoClose={30000} 
         hideProgressBar={false} 
         newestOnTop={false} 
         closeOnClick 
